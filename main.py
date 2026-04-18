@@ -306,7 +306,7 @@ def render_html(result: CalendarResult) -> str:
     body, table, td, div, p, span, a {{
       font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
     }}
-    table {{ border-collapse: collapse; }}
+    table {{ border-collapse: collapse; border-spacing: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
     .page {{ width: 100%; background: #fdf9f1; padding: 24px 0; }}
     .container {{ width: 100%; max-width: 860px; margin: 0 auto; }}
     .hero {{
@@ -580,14 +580,18 @@ def render_html(result: CalendarResult) -> str:
             <td>
               <table role="presentation" class="pair-grid mobile-stack" width="100%">
                 <tr>
-                  <td class="pair-col first">
-                    <div class="pair-head info">吉神</div>
-                    <div class="pair-body"><div class="tags">{render_badges(result.good_gods, 'info')}</div></div>
+                  <td class="first" style="vertical-align:top;">
+                    <table role="presentation" class="pair-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr><td class="pair-head info">吉神</td></tr>
+                      <tr><td class="pair-body"><div class="tags">{render_badges(result.good_gods, 'info')}</div></td></tr>
+                    </table>
                   </td>
                   <td class="pair-gap">&nbsp;</td>
-                  <td class="pair-col last">
-                    <div class="pair-head warn">凶煞</div>
-                    <div class="pair-body"><div class="tags">{render_badges(result.bad_gods, 'warn')}</div></div>
+                  <td class="last" style="vertical-align:top;">
+                    <table role="presentation" class="pair-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr><td class="pair-head warn">凶煞</td></tr>
+                      <tr><td class="pair-body"><div class="tags">{render_badges(result.bad_gods, 'warn')}</div></td></tr>
+                    </table>
                   </td>
                 </tr>
               </table>
