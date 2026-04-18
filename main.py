@@ -294,72 +294,97 @@ def render_html(result: CalendarResult) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>今日黄历</title>
   <style>
+    :root {{
+      --font-sans: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+      --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+      --bg-paper: #fdf9f1;
+      --ink-main: #3e3836;
+      --ink-muted: #7a6c66;
+      --accent-red: #9b3d3d;
+      --card-border: #ece3d6;
+      --card-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
+      --good-bg: #f0f5f1;
+      --good-text: #4e7a5a;
+      --bad-bg: #faf1f0;
+      --bad-text: #9b3d3d;
+      --info-bg: #f8f3ea;
+      --info-text: #6e6158;
+    }}
     body {{
       margin: 0;
       padding: 0;
-      background: #f5f7fb;
-      color: #172033;
-      font: 15px/1.7 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg-paper);
+      color: var(--ink-main);
+      font: 15px/1.7 var(--font-sans);
     }}
     table {{ border-collapse: collapse; }}
-    .page {{ width: 100%; background: #f5f7fb; padding: 24px 0; }}
+    .page {{ width: 100%; background: var(--bg-paper); padding: 24px 0; }}
     .container {{ width: 100%; max-width: 860px; margin: 0 auto; }}
     .hero {{
-      background: linear-gradient(135deg, #fff8f5 0%, #fbe7e0 38%, #f1cdc1 100%);
-      border: 1px solid #ebc9bc;
+      background:
+        radial-gradient(circle at top left, rgba(155, 61, 61, 0.05) 0%, rgba(155, 61, 61, 0) 42%),
+        linear-gradient(135deg, #fdf9f1 0%, #f7efe2 56%, #f3eadf 100%);
+      border: 1px solid #eadfce;
       border-radius: 22px;
       overflow: hidden;
-      color: #734716;
-      box-shadow: 0 12px 30px rgba(126, 60, 38, 0.10);
+      color: var(--ink-main);
+      box-shadow: 0 12px 30px rgba(110, 84, 58, 0.10);
     }}
     .hero-inner {{
       padding: 28px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 100%);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.20) 100%),
+        repeating-linear-gradient(0deg, rgba(140, 120, 96, 0.022) 0, rgba(140, 120, 96, 0.022) 1px, rgba(255,255,255,0) 1px, rgba(255,255,255,0) 8px);
     }}
     .hero-main {{
       margin: 0;
       font-size: 26px;
       line-height: 1.25;
       font-weight: 700;
-      color: #1f1f1f;
-      text-shadow: 0 1px 0 rgba(255,255,255,0.45);
+      color: var(--ink-main);
+      font-family: var(--font-sans);
+      text-shadow: 0 1px 0 rgba(255,255,255,0.42);
     }}
     .hero-sub {{
-      margin: 2px 0 0;
-      font-size: 28px;
-      line-height: 1.25;
+      margin: 6px 0 0;
+      font-size: 30px;
+      line-height: 1.35;
       font-weight: 700;
-      color: #7d3f17;
+      letter-spacing: 0.02em;
+      color: var(--accent-red);
+      font-family: var(--font-serif);
       text-shadow: 0 1px 0 rgba(255,255,255,0.42);
     }}
     .meta-lines {{ margin-top: 10px; }}
     .meta-line {{
       margin-top: 4px;
       font-size: 16px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 1.45;
-      color: #6d4520;
+      color: var(--ink-muted);
+      font-family: var(--font-sans);
       word-break: break-word;
       overflow-wrap: anywhere;
     }}
     .spacer {{ height: 16px; line-height: 16px; }}
     .card {{
       background: #ffffff;
-      border: 1px solid #dbe3ef;
+      border: 1px solid var(--card-border);
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 10px 28px rgba(22, 34, 56, 0.08);
+      box-shadow: var(--card-shadow);
     }}
     .card-inner {{
       padding: 18px;
       word-break: break-word;
       overflow-wrap: anywhere;
     }}
-    .label {{ color: #60708a; font-size: 13px; margin-bottom: 6px; }}
+    .label {{ color: var(--ink-muted); font-size: 13px; margin-bottom: 6px; font-family: var(--font-sans); }}
     .value {{
       font-size: 16px;
       font-weight: 600;
-      color: #172033;
+      color: var(--ink-main);
+      font-family: var(--font-sans);
       line-height: 1.55;
       word-break: break-word;
       overflow-wrap: anywhere;
@@ -379,10 +404,10 @@ def render_html(result: CalendarResult) -> str:
     .pair-col {{
       vertical-align: top;
       background: #ffffff;
-      border: 1px solid #dbe3ef;
+      border: 1px solid var(--card-border);
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 10px 28px rgba(22, 34, 56, 0.08);
+      box-shadow: var(--card-shadow);
     }}
     .pair-gap {{
       width: 14px;
@@ -396,10 +421,10 @@ def render_html(result: CalendarResult) -> str:
       border-collapse: separate;
       border-spacing: 0;
       background: #ffffff;
-      border: 1px solid #dbe3ef;
+      border: 1px solid var(--card-border);
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 10px 28px rgba(22, 34, 56, 0.08);
+      box-shadow: var(--card-shadow);
     }}
     .pair-panel-inner {{
       padding: 18px;
@@ -411,12 +436,13 @@ def render_html(result: CalendarResult) -> str:
       padding: 12px 16px;
       font-size: 16px;
       font-weight: 700;
-      border-bottom: 1px solid #e8edf5;
+      font-family: var(--font-sans);
+      border-bottom: 1px solid #efe6da;
     }}
-    .pair-head.good {{ background: #e8f7ef; color: #17653d; }}
-    .pair-head.bad {{ background: #fff0f0; color: #a03d3d; }}
-    .pair-head.info {{ background: #edf4ff; color: #1d4ed8; }}
-    .pair-head.warn {{ background: #fff6e8; color: #9a5b00; }}
+    .pair-head.good {{ background: var(--good-bg); color: var(--good-text); }}
+    .pair-head.bad {{ background: var(--bad-bg); color: var(--bad-text); }}
+    .pair-head.info {{ background: var(--info-bg); color: var(--info-text); }}
+    .pair-head.warn {{ background: #f7efe8; color: #8a5d4d; }}
     .pair-body {{
       padding: 16px;
       vertical-align: top;
@@ -427,9 +453,10 @@ def render_html(result: CalendarResult) -> str:
       line-height: 1.75;
       word-break: break-word;
       font-weight: 500;
+      font-family: var(--font-sans);
     }}
-    .dense-list.good {{ color: #17653d; }}
-    .dense-list.bad {{ color: #8f3a3a; }}
+    .dense-list.good {{ color: var(--good-text); }}
+    .dense-list.bad {{ color: var(--bad-text); }}
     .tags {{ font-size: 0; }}
     .tag {{
       display: inline-block;
@@ -443,35 +470,36 @@ def render_html(result: CalendarResult) -> str:
       white-space: normal;
       word-break: break-word;
       overflow-wrap: anywhere;
+      font-family: var(--font-sans);
     }}
-    .tag-good {{ background: #e8f7ef; color: #17653d; border-color: #ccead8; }}
-    .tag-bad {{ background: #fff0f0; color: #a03d3d; border-color: #f5d4d4; }}
-    .tag-info {{ background: #edf4ff; color: #1d4ed8; border-color: #d5e3ff; }}
-    .tag-warn {{ background: #fff6e8; color: #9a5b00; border-color: #f2dfb3; }}
-    .tag-muted {{ background: #eef2f7; color: #5d6b82; border-color: #dce3ed; }}
-    .section-title {{ font-size: 18px; font-weight: 700; color: #172033; margin: 0 0 12px; }}
+    .tag-good {{ background: var(--good-bg); color: var(--good-text); border-color: #dbe8df; }}
+    .tag-bad {{ background: var(--bad-bg); color: var(--bad-text); border-color: #efd6d2; }}
+    .tag-info {{ background: var(--info-bg); color: var(--info-text); border-color: #e9ddd0; }}
+    .tag-warn {{ background: #f8efe7; color: #8a5d4d; border-color: #ead8c9; }}
+    .tag-muted {{ background: #f5efe7; color: var(--ink-muted); border-color: #e7ddd1; }}
+    .section-title {{ font-size: 18px; font-weight: 700; color: var(--ink-main); margin: 0 0 12px; font-family: var(--font-sans); }}
     .time-table {{
       width: 100%;
       background: #ffffff;
-      border: 1px solid #dbe3ef;
+      border: 1px solid var(--card-border);
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 10px 28px rgba(22, 34, 56, 0.08);
+      box-shadow: var(--card-shadow);
     }}
     .time-table th,
-    .time-table td {{ padding: 12px 14px; border-bottom: 1px solid #e8edf5; text-align: left; }}
-    .time-table th {{ background: #f8fafc; color: #60708a; font-size: 13px; font-weight: 600; }}
+    .time-table td {{ padding: 12px 14px; border-bottom: 1px solid #efe6da; text-align: left; font-family: var(--font-sans); color: var(--ink-main); }}
+    .time-table th {{ background: #f8f4ee; color: var(--ink-muted); font-size: 13px; font-weight: 600; }}
     .time-table tr:last-child td {{ border-bottom: none; }}
     .luck {{ display: inline-block; min-width: 42px; text-align: center; padding: 4px 10px; border-radius: 999px; font-weight: 700; }}
-    .luck.good {{ background: #e8f7ef; color: #17653d; }}
-    .luck.bad {{ background: #fff0f0; color: #a03d3d; }}
-    .footer {{ color: #60708a; font-size: 12px; text-align: center; padding: 10px 0 0; }}
+    .luck.good {{ background: var(--good-bg); color: var(--good-text); }}
+    .luck.bad {{ background: var(--bad-bg); color: var(--bad-text); }}
+    .footer {{ color: #8d7f77; font-size: 12px; text-align: center; padding: 10px 0 0; font-family: var(--font-sans); }}
 
     @media only screen and (max-width: 700px) {{
       .page {{ padding: 12px 0 !important; }}
       .hero-inner {{ padding: 18px !important; }}
       .hero-main {{ font-size: 20px !important; }}
-      .hero-sub {{ font-size: 22px !important; }}
+      .hero-sub {{ font-size: 24px !important; line-height: 1.32 !important; }}
       .meta-line {{ font-size: 15px !important; }}
       .pair-grid.mobile-stack,
       .pair-grid.mobile-stack tbody,
