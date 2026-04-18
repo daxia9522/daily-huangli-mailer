@@ -319,7 +319,7 @@ def render_html(result: CalendarResult) -> str:
       box-shadow: 0 12px 30px rgba(110, 84, 58, 0.10);
     }}
     .hero-inner {{
-      padding: 28px;
+      padding: 24px;
       background-color: rgba(255,255,255,0.24);
     }}
     .hero-main {{
@@ -333,8 +333,8 @@ def render_html(result: CalendarResult) -> str:
     }}
     .hero-sub {{
       margin: 6px 0 0;
-      font-size: 34px;
-      line-height: 1.35;
+      font-size: 28px;
+      line-height: 1.3;
       font-weight: 700;
       letter-spacing: 0.02em;
       color: #9b3d3d;
@@ -485,7 +485,7 @@ def render_html(result: CalendarResult) -> str:
       .page {{ padding: 12px 0 !important; }}
       .hero-inner {{ padding: 18px !important; }}
       .hero-main {{ font-size: 20px !important; }}
-      .hero-sub {{ font-size: 28px !important; line-height: 1.32 !important; }}
+      .hero-sub {{ font-size: 24px !important; line-height: 1.28 !important; }}
       .meta-line {{ font-size: 15px !important; }}
       .pair-grid.mobile-stack,
       .pair-grid.mobile-stack tbody,
@@ -519,9 +519,9 @@ def render_html(result: CalendarResult) -> str:
             <td>
               <table role="presentation" class="hero" width="100%" style="background:#FDF9F1;background-image:linear-gradient(135deg,#FDF9F1 0%,#F7EFE2 56%,#F3EADF 100%);border:1px solid #EADFCE;border-radius:22px;overflow:hidden;color:#3E3836;box-shadow:0 12px 30px rgba(110,84,58,0.10);">
                 <tr>
-                  <td class="hero-inner" style="padding:28px;background-color:rgba(255,255,255,0.24);">
+                  <td class="hero-inner" style="padding:24px;background-color:rgba(255,255,255,0.24);">
                     <div class="hero-main" style="margin:0;font-size:24px;line-height:1.25;font-weight:600;color:#3E3836;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;text-shadow:0 1px 0 rgba(255,255,255,0.42);">{html.escape(result.solar_date)} {html.escape(result.weekday)}</div>
-                    <div class="hero-sub" style="margin:6px 0 0;font-size:34px;line-height:1.35;font-weight:700;letter-spacing:0.02em;color:#9B3D3D;font-family:'Songti SC','STSong','SimSun','Noto Serif CJK SC','Noto Serif SC',serif;text-shadow:0 1px 0 rgba(255,255,255,0.42);">{html.escape(result.lunar_date)}</div>
+                    <div class="hero-sub" style="margin:6px 0 0;font-size:28px;line-height:1.3;font-weight:700;letter-spacing:0.02em;color:#9B3D3D;font-family:'Songti SC','STSong','SimSun','Noto Serif CJK SC','Noto Serif SC',serif;text-shadow:0 1px 0 rgba(255,255,255,0.42);">{html.escape(result.lunar_date)}</div>
                     <div class="meta-lines">
                       <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">干支：{html.escape(result.ganzhi)}</div>
                       <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">冲煞：{html.escape(result.zodiac_clash)}</div>
