@@ -297,7 +297,7 @@ def render_html(result: CalendarResult) -> str:
     body {{
       margin: 0;
       padding: 0;
-      background: #fdf9f1;
+      background: #ffffff;
       color: #3e3836;
       font-size: 15px;
       line-height: 1.7;
@@ -307,7 +307,7 @@ def render_html(result: CalendarResult) -> str:
       font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
     }}
     table {{ border-collapse: collapse; border-spacing: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
-    .page {{ width: 100%; background: #fdf9f1; padding: 24px 0; }}
+    .page {{ width: 100%; background: #ffffff; padding: 24px 0; }}
     .container {{ width: 100%; max-width: 860px; margin: 0 auto; }}
     .hero {{
       background: #fdf9f1;
@@ -510,8 +510,8 @@ def render_html(result: CalendarResult) -> str:
     }}
   </style>
 </head>
-<body style="margin:0;padding:0;background:#FDF9F1;color:#3E3836;font-size:15px;line-height:1.7;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">
-  <table role="presentation" class="page" width="100%" style="width:100%;background:#FDF9F1;padding:24px 0;">
+<body style="margin:0;padding:0;background:#FFFFFF;color:#3E3836;font-size:15px;line-height:1.7;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">
+  <table role="presentation" class="page" width="100%" style="width:100%;background:#FFFFFF;padding:24px 0;">
     <tr>
       <td align="center">
         <table role="presentation" class="container" width="100%">
