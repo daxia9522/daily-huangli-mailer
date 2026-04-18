@@ -294,65 +294,51 @@ def render_html(result: CalendarResult) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>今日黄历</title>
   <style>
-    :root {{
-      --font-sans: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', sans-serif;
-      --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
-      --bg-paper: #fdf9f1;
-      --ink-main: #3e3836;
-      --ink-muted: #7a6c66;
-      --accent-red: #9b3d3d;
-      --card-border: #ece3d6;
-      --card-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
-      --good-bg: #f0f5f1;
-      --good-text: #4e7a5a;
-      --bad-bg: #faf1f0;
-      --bad-text: #9b3d3d;
-      --info-bg: #f8f3ea;
-      --info-text: #6e6158;
-    }}
     body {{
       margin: 0;
       padding: 0;
-      background: var(--bg-paper);
-      color: var(--ink-main);
-      font: 15px/1.7 var(--font-sans);
+      background: #fdf9f1;
+      color: #3e3836;
+      font-size: 15px;
+      line-height: 1.7;
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
+    }}
+    body, table, td, div, p, span, a {{
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
     }}
     table {{ border-collapse: collapse; }}
-    .page {{ width: 100%; background: var(--bg-paper); padding: 24px 0; }}
+    .page {{ width: 100%; background: #fdf9f1; padding: 24px 0; }}
     .container {{ width: 100%; max-width: 860px; margin: 0 auto; }}
     .hero {{
-      background:
-        radial-gradient(circle at top left, rgba(155, 61, 61, 0.05) 0%, rgba(155, 61, 61, 0) 42%),
-        linear-gradient(135deg, #fdf9f1 0%, #f7efe2 56%, #f3eadf 100%);
+      background: #fdf9f1;
+      background-image: linear-gradient(135deg, #fdf9f1 0%, #f7efe2 56%, #f3eadf 100%);
       border: 1px solid #eadfce;
       border-radius: 22px;
       overflow: hidden;
-      color: var(--ink-main);
+      color: #3e3836;
       box-shadow: 0 12px 30px rgba(110, 84, 58, 0.10);
     }}
     .hero-inner {{
       padding: 28px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.20) 100%),
-        repeating-linear-gradient(0deg, rgba(140, 120, 96, 0.022) 0, rgba(140, 120, 96, 0.022) 1px, rgba(255,255,255,0) 1px, rgba(255,255,255,0) 8px);
+      background-color: rgba(255,255,255,0.24);
     }}
     .hero-main {{
       margin: 0;
-      font-size: 26px;
+      font-size: 24px;
       line-height: 1.25;
-      font-weight: 700;
-      color: var(--ink-main);
-      font-family: var(--font-sans);
+      font-weight: 600;
+      color: #3e3836;
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
       text-shadow: 0 1px 0 rgba(255,255,255,0.42);
     }}
     .hero-sub {{
       margin: 6px 0 0;
-      font-size: 30px;
+      font-size: 34px;
       line-height: 1.35;
       font-weight: 700;
       letter-spacing: 0.02em;
-      color: var(--accent-red);
-      font-family: var(--font-serif);
+      color: #9b3d3d;
+      font-family: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif CJK SC', 'Noto Serif SC', serif;
       text-shadow: 0 1px 0 rgba(255,255,255,0.42);
     }}
     .meta-lines {{ margin-top: 10px; }}
@@ -361,30 +347,30 @@ def render_html(result: CalendarResult) -> str:
       font-size: 16px;
       font-weight: 500;
       line-height: 1.45;
-      color: var(--ink-muted);
-      font-family: var(--font-sans);
+      color: #7a6c66;
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
       word-break: break-word;
       overflow-wrap: anywhere;
     }}
     .spacer {{ height: 16px; line-height: 16px; }}
     .card {{
       background: #ffffff;
-      border: 1px solid var(--card-border);
+      border: 1px solid #ece3d6;
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: var(--card-shadow);
+      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
     }}
     .card-inner {{
       padding: 18px;
       word-break: break-word;
       overflow-wrap: anywhere;
     }}
-    .label {{ color: var(--ink-muted); font-size: 13px; margin-bottom: 6px; font-family: var(--font-sans); }}
+    .label {{ color: #7a6c66; font-size: 13px; margin-bottom: 6px; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; }}
     .value {{
       font-size: 16px;
       font-weight: 600;
-      color: var(--ink-main);
-      font-family: var(--font-sans);
+      color: #3e3836;
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
       line-height: 1.55;
       word-break: break-word;
       overflow-wrap: anywhere;
@@ -404,10 +390,10 @@ def render_html(result: CalendarResult) -> str:
     .pair-col {{
       vertical-align: top;
       background: #ffffff;
-      border: 1px solid var(--card-border);
+      border: 1px solid #ece3d6;
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: var(--card-shadow);
+      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
     }}
     .pair-gap {{
       width: 14px;
@@ -421,10 +407,10 @@ def render_html(result: CalendarResult) -> str:
       border-collapse: separate;
       border-spacing: 0;
       background: #ffffff;
-      border: 1px solid var(--card-border);
+      border: 1px solid #ece3d6;
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: var(--card-shadow);
+      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
     }}
     .pair-panel-inner {{
       padding: 18px;
@@ -436,12 +422,12 @@ def render_html(result: CalendarResult) -> str:
       padding: 12px 16px;
       font-size: 16px;
       font-weight: 700;
-      font-family: var(--font-sans);
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
       border-bottom: 1px solid #efe6da;
     }}
-    .pair-head.good {{ background: var(--good-bg); color: var(--good-text); }}
-    .pair-head.bad {{ background: var(--bad-bg); color: var(--bad-text); }}
-    .pair-head.info {{ background: var(--info-bg); color: var(--info-text); }}
+    .pair-head.good {{ background: #f0f5f1; color: #4e7a5a; }}
+    .pair-head.bad {{ background: #faf1f0; color: #9b3d3d; }}
+    .pair-head.info {{ background: #f8f3ea; color: #6e6158; }}
     .pair-head.warn {{ background: #f7efe8; color: #8a5d4d; }}
     .pair-body {{
       padding: 16px;
@@ -453,10 +439,10 @@ def render_html(result: CalendarResult) -> str:
       line-height: 1.75;
       word-break: break-word;
       font-weight: 500;
-      font-family: var(--font-sans);
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
     }}
-    .dense-list.good {{ color: var(--good-text); }}
-    .dense-list.bad {{ color: var(--bad-text); }}
+    .dense-list.good {{ color: #4e7a5a; }}
+    .dense-list.bad {{ color: #9b3d3d; }}
     .tags {{ font-size: 0; }}
     .tag {{
       display: inline-block;
@@ -470,36 +456,36 @@ def render_html(result: CalendarResult) -> str:
       white-space: normal;
       word-break: break-word;
       overflow-wrap: anywhere;
-      font-family: var(--font-sans);
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
     }}
-    .tag-good {{ background: var(--good-bg); color: var(--good-text); border-color: #dbe8df; }}
-    .tag-bad {{ background: var(--bad-bg); color: var(--bad-text); border-color: #efd6d2; }}
-    .tag-info {{ background: var(--info-bg); color: var(--info-text); border-color: #e9ddd0; }}
+    .tag-good {{ background: #f0f5f1; color: #4e7a5a; border-color: #dbe8df; }}
+    .tag-bad {{ background: #faf1f0; color: #9b3d3d; border-color: #efd6d2; }}
+    .tag-info {{ background: #f8f3ea; color: #6e6158; border-color: #e9ddd0; }}
     .tag-warn {{ background: #f8efe7; color: #8a5d4d; border-color: #ead8c9; }}
-    .tag-muted {{ background: #f5efe7; color: var(--ink-muted); border-color: #e7ddd1; }}
-    .section-title {{ font-size: 18px; font-weight: 700; color: var(--ink-main); margin: 0 0 12px; font-family: var(--font-sans); }}
+    .tag-muted {{ background: #f5efe7; color: #7a6c66; border-color: #e7ddd1; }}
+    .section-title {{ font-size: 18px; font-weight: 700; color: #3e3836; margin: 0 0 12px; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; }}
     .time-table {{
       width: 100%;
       background: #ffffff;
-      border: 1px solid var(--card-border);
+      border: 1px solid #ece3d6;
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: var(--card-shadow);
+      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
     }}
     .time-table th,
-    .time-table td {{ padding: 12px 14px; border-bottom: 1px solid #efe6da; text-align: left; font-family: var(--font-sans); color: var(--ink-main); }}
-    .time-table th {{ background: #f8f4ee; color: var(--ink-muted); font-size: 13px; font-weight: 600; }}
+    .time-table td {{ padding: 12px 14px; border-bottom: 1px solid #efe6da; text-align: left; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; color: #3e3836; }}
+    .time-table th {{ background: #f8f4ee; color: #7a6c66; font-size: 13px; font-weight: 600; }}
     .time-table tr:last-child td {{ border-bottom: none; }}
     .luck {{ display: inline-block; min-width: 42px; text-align: center; padding: 4px 10px; border-radius: 999px; font-weight: 700; }}
-    .luck.good {{ background: var(--good-bg); color: var(--good-text); }}
-    .luck.bad {{ background: var(--bad-bg); color: var(--bad-text); }}
-    .footer {{ color: #8d7f77; font-size: 12px; text-align: center; padding: 10px 0 0; font-family: var(--font-sans); }}
+    .luck.good {{ background: #f0f5f1; color: #4e7a5a; }}
+    .luck.bad {{ background: #faf1f0; color: #9b3d3d; }}
+    .footer {{ color: #8d7f77; font-size: 12px; text-align: center; padding: 10px 0 0; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; }}
 
     @media only screen and (max-width: 700px) {{
       .page {{ padding: 12px 0 !important; }}
       .hero-inner {{ padding: 18px !important; }}
       .hero-main {{ font-size: 20px !important; }}
-      .hero-sub {{ font-size: 24px !important; line-height: 1.32 !important; }}
+      .hero-sub {{ font-size: 28px !important; line-height: 1.32 !important; }}
       .meta-line {{ font-size: 15px !important; }}
       .pair-grid.mobile-stack,
       .pair-grid.mobile-stack tbody,
@@ -524,23 +510,23 @@ def render_html(result: CalendarResult) -> str:
     }}
   </style>
 </head>
-<body>
-  <table role="presentation" class="page" width="100%">
+<body style="margin:0;padding:0;background:#FDF9F1;color:#3E3836;font-size:15px;line-height:1.7;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">
+  <table role="presentation" class="page" width="100%" style="width:100%;background:#FDF9F1;padding:24px 0;">
     <tr>
       <td align="center">
         <table role="presentation" class="container" width="100%">
           <tr>
             <td>
-              <table role="presentation" class="hero" width="100%">
+              <table role="presentation" class="hero" width="100%" style="background:#FDF9F1;background-image:linear-gradient(135deg,#FDF9F1 0%,#F7EFE2 56%,#F3EADF 100%);border:1px solid #EADFCE;border-radius:22px;overflow:hidden;color:#3E3836;box-shadow:0 12px 30px rgba(110,84,58,0.10);">
                 <tr>
-                  <td class="hero-inner">
-                    <div class="hero-main">{html.escape(result.solar_date)} {html.escape(result.weekday)}</div>
-                    <div class="hero-sub">{html.escape(result.lunar_date)}</div>
+                  <td class="hero-inner" style="padding:28px;background-color:rgba(255,255,255,0.24);">
+                    <div class="hero-main" style="margin:0;font-size:24px;line-height:1.25;font-weight:600;color:#3E3836;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;text-shadow:0 1px 0 rgba(255,255,255,0.42);">{html.escape(result.solar_date)} {html.escape(result.weekday)}</div>
+                    <div class="hero-sub" style="margin:6px 0 0;font-size:34px;line-height:1.35;font-weight:700;letter-spacing:0.02em;color:#9B3D3D;font-family:'Songti SC','STSong','SimSun','Noto Serif CJK SC','Noto Serif SC',serif;text-shadow:0 1px 0 rgba(255,255,255,0.42);">{html.escape(result.lunar_date)}</div>
                     <div class="meta-lines">
-                      <div class="meta-line">干支：{html.escape(result.ganzhi)}</div>
-                      <div class="meta-line">冲煞：{html.escape(result.zodiac_clash)}</div>
-                      <div class="meta-line">建除十二神：{html.escape(result.officer12)}</div>
-                      <div class="meta-line">吉凶等级：{html.escape(result.level_name)}</div>
+                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">干支：{html.escape(result.ganzhi)}</div>
+                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">冲煞：{html.escape(result.zodiac_clash)}</div>
+                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">建除十二神：{html.escape(result.officer12)}</div>
+                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">吉凶等级：{html.escape(result.level_name)}</div>
                     </div>
                   </td>
                 </tr>
