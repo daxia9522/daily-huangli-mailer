@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import html
 import os
+import re
 import smtplib
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -31,6 +32,14 @@ HOUR_WINDOWS = [
     "19:00-20:59",
     "21:00-22:59",
 ]
+FONT_SANS = (
+    "'PingFang SC','Hiragino Sans GB','Microsoft YaHei',"
+    "'Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif"
+)
+FONT_SERIF = (
+    "'Songti SC','STSong','SimSun',"
+    "'Noto Serif CJK SC','Noto Serif SC',serif"
+)
 
 
 @dataclass
@@ -51,7 +60,12 @@ class CalendarResult:
     holidays: list[str]
     zodiac_clash: str
     officer12: str
+    day_star: str
+    day_path: str
     level_name: str
+    level_short: str
+    fetal_god: str
+    directions: list[str]
     good_gods: list[str]
     bad_gods: list[str]
     good_things: list[str]
@@ -75,12 +89,8 @@ def normalize_items(value: Any) -> list[str]:
     raw = str(value).strip()
     if not raw or raw.lower() == "none":
         return []
-    for sep in ["、", "，", ",", " "]:
-        if sep in raw and len(raw) > 1:
-            parts = [part.strip() for part in raw.split(sep) if part.strip()]
-            if len(parts) > 1:
-                return parts
-    return [raw]
+    parts = [part.strip() for part in re.split(r"[、，,;；\s]+", raw) if part.strip()]
+    return parts if parts else [raw]
 
 
 def parse_target_datetime(raw: str | None) -> datetime:
@@ -147,6 +157,13 @@ def get_holidays(lunar_obj: Any) -> list[str]:
     return result
 
 
+def get_officer_fields(lunar_obj: Any) -> tuple[str, str, str]:
+    info = lunar_obj.get_today12DayOfficer()
+    if isinstance(info, (list, tuple)) and len(info) >= 3:
+        return f"{info[0]}日", str(info[1]), str(info[2])
+    return f"{lunar_obj.today12DayOfficer}日", "", ""
+
+
 def get_hour_luck(lunar_obj: Any) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     branches = list(lunar_obj.twohour8CharList[:12])
@@ -158,6 +175,9 @@ def get_hour_luck(lunar_obj: Any) -> list[dict[str, str]]:
 
 def build_result(dt: datetime) -> CalendarResult:
     lunar_obj = build_lunar(dt)
+    officer12, day_star, day_path = get_officer_fields(lunar_obj)
+    level_name = str(lunar_obj.todayLevelName)
+    level_short = str(getattr(lunar_obj, "thingLevelName", "") or "").strip() or level_name
     return CalendarResult(
         solar_date=dt.strftime("%Y-%m-%d"),
         weekday=str(lunar_obj.weekDayCn),
@@ -168,8 +188,13 @@ def build_result(dt: datetime) -> CalendarResult:
         today_term_exact=(str(lunar_obj.todaySolarTerms) != "无"),
         holidays=get_holidays(lunar_obj),
         zodiac_clash=str(lunar_obj.chineseZodiacClash),
-        officer12=f"{lunar_obj.today12DayOfficer}日",
-        level_name=str(lunar_obj.todayLevelName),
+        officer12=officer12,
+        day_star=day_star,
+        day_path=day_path,
+        level_name=level_name,
+        level_short=level_short,
+        fetal_god=str(lunar_obj.get_fetalGod() or "").strip(),
+        directions=normalize_items(lunar_obj.get_luckyGodsDirection()),
         good_gods=normalize_items(lunar_obj.goodGodName),
         bad_gods=normalize_items(lunar_obj.badGodName),
         good_things=normalize_items(lunar_obj.goodThing),
@@ -184,8 +209,35 @@ def term_line(result: CalendarResult) -> str:
     return f"节气：当前属{result.current_term.name}；下一节气：{result.next_term.name} {result.next_term.date}"
 
 
+def term_html_value(result: CalendarResult) -> str:
+    if result.today_term_exact:
+        return html.escape(f"{result.current_term.name}（今日交节）")
+    return (
+        f"当前属{html.escape(result.current_term.name)}<br>"
+        f"下一节气：{html.escape(result.next_term.name)} {html.escape(result.next_term.date)}"
+    )
+
+
+def officer_line(result: CalendarResult) -> str:
+    parts = [result.officer12]
+    if result.day_star:
+        parts.append(result.day_star)
+    if result.day_path:
+        parts.append(result.day_path)
+    return " · ".join(parts)
+
+
 def join_items(items: list[str]) -> str:
     return "、".join(items) if items else "无"
+
+
+def luck_kind(luck: str) -> str:
+    text = luck.strip()
+    if text == "吉" or text.endswith("吉"):
+        return "good"
+    if text == "凶" or text.endswith("凶"):
+        return "bad"
+    return "neutral"
 
 
 def render_text(result: CalendarResult) -> str:
@@ -200,8 +252,18 @@ def render_text(result: CalendarResult) -> str:
     lines.extend(
         [
             f"冲煞：{result.zodiac_clash}",
-            f"建除十二神：{result.officer12}",
-            f"吉凶等级：{result.level_name}",
+            f"建除十二神：{officer_line(result)}",
+            f"吉凶：{result.level_short}",
+        ]
+    )
+    if result.level_name and result.level_name not in {"无", result.level_short}:
+        lines.append(f"说明：{result.level_name}")
+    if result.directions:
+        lines.append(f"方位：{join_items(result.directions)}")
+    if result.fetal_god:
+        lines.append(f"胎神：{result.fetal_god}")
+    lines.extend(
+        [
             f"吉神：{join_items(result.good_gods)}",
             f"凶煞：{join_items(result.bad_gods)}",
             f"宜：{join_items(result.good_things)}",
@@ -222,6 +284,8 @@ def markdown_list_cell(items: list[str]) -> str:
 
 def render_markdown(result: CalendarResult) -> str:
     holiday_line = f"- 节日：{join_items(result.holidays)}\n" if result.holidays else ""
+    direction_line = f"- 方位：{join_items(result.directions)}\n" if result.directions else ""
+    fetal_line = f"- 胎神：{result.fetal_god}\n" if result.fetal_god else ""
     parts = [
         "# 今日黄历",
         "",
@@ -231,8 +295,10 @@ def render_markdown(result: CalendarResult) -> str:
         f"- {term_line(result)}",
         holiday_line.rstrip(),
         f"- 冲煞：{result.zodiac_clash}",
-        f"- 建除十二神：{result.officer12}",
-        f"- 吉凶等级：{result.level_name}",
+        f"- 建除十二神：{officer_line(result)}",
+        f"- 吉凶：{result.level_short}",
+        direction_line.rstrip(),
+        fetal_line.rstrip(),
         "",
         "## 宜忌",
         "",
@@ -258,9 +324,26 @@ def render_markdown(result: CalendarResult) -> str:
 
 def render_badges(items: list[str], kind: str) -> str:
     if not items:
-        return '<span class="tag tag-muted">无</span>'
+        return (
+            f'<span style="display:inline-block;margin:0 8px 8px 0;padding:6px 10px;'
+            f"border-radius:999px;font-size:13px;line-height:1.4;background:#F5EFE7;"
+            f'color:#7A6C66;border:1px solid #E7DDD1;font-family:{FONT_SANS};">无</span>'
+        )
+    palette = {
+        "good": ("#F0F5F1", "#4E7A5A", "#DBE8DF"),
+        "bad": ("#FAF1F0", "#9B3D3D", "#EFD6D2"),
+        "info": ("#F8F3EA", "#6E6158", "#E9DDD0"),
+        "warn": ("#F8EFE7", "#8A5D4D", "#EAD8C9"),
+    }
+    bg, color, border = palette.get(kind, palette["info"])
     return "".join(
-        f'<span class="tag tag-{kind}">{html.escape(item)}</span>' for item in items
+        (
+            f'<span style="display:inline-block;margin:0 8px 8px 0;padding:6px 10px;'
+            f"border-radius:999px;font-size:13px;line-height:1.4;background:{bg};"
+            f"color:{color};border:1px solid {border};max-width:100%;"
+            f'word-break:break-word;font-family:{FONT_SANS};">{html.escape(item)}</span>'
+        )
+        for item in items
     )
 
 
@@ -268,265 +351,193 @@ def render_dense_lines(items: list[str], chunk: int = 8) -> str:
     if not items:
         return "无"
     escaped = [html.escape(item) for item in items]
-    lines = ["、".join(escaped[i:i + chunk]) for i in range(0, len(escaped), chunk)]
+    lines = ["、".join(escaped[i : i + chunk]) for i in range(0, len(escaped), chunk)]
     return "<br>".join(lines)
+
+
+def email_spacer(height: int = 16) -> str:
+    return (
+        f'<tr><td height="{height}" style="height:{height}px;line-height:{height}px;'
+        f'font-size:0;">&nbsp;</td></tr>'
+    )
+
+
+def email_section_card(title: str, body_html: str, head_bg: str, head_color: str) -> str:
+    return f"""
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;">
+  <tr>
+    <td bgcolor="{head_bg}" style="padding:12px 16px;background:{head_bg};color:{head_color};
+      font-size:16px;font-weight:700;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;">
+      {html.escape(title)}
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:16px;font-family:{FONT_SANS};color:#3E3836;font-size:14px;line-height:1.75;
+      word-break:break-word;">
+      {body_html}
+    </td>
+  </tr>
+</table>
+"""
+
+
+def email_pair_row(left_html: str, right_html: str) -> str:
+    # Fixed 50/50 + padding gap. Nested tables only; no CSS-only column widths.
+    return f"""
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+  <tr>
+    <td width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 6px 0 0;">
+      {left_html}
+    </td>
+    <td width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 0 0 6px;">
+      {right_html}
+    </td>
+  </tr>
+</table>
+"""
+
+
+def email_mini_card(label: str, value_html: str) -> str:
+    return f"""
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;">
+  <tr>
+    <td style="padding:14px 16px;font-family:{FONT_SANS};">
+      <div style="color:#7A6C66;font-size:13px;margin:0 0 6px;font-family:{FONT_SANS};">{html.escape(label)}</div>
+      <div style="color:#3E3836;font-size:15px;font-weight:600;line-height:1.55;font-family:{FONT_SANS};
+        word-break:break-word;">{value_html}</div>
+    </td>
+  </tr>
+</table>
+"""
 
 
 def render_html(result: CalendarResult) -> str:
     holiday_value = html.escape(join_items(result.holidays)) if result.holidays else "今日无特别节日"
-    term_value = html.escape(term_line(result)).replace("；", "；<br>")
-
-    hour_rows = "".join(
-        f"""
-        <tr>
-          <td>{html.escape(row['slot'])}</td>
-          <td>{html.escape(row['ganzhi'])}</td>
-          <td><span class="luck {'good' if row['luck'] == '吉' else 'bad'}">{html.escape(row['luck'])}</span></td>
-        </tr>
-        """
-        for row in result.hour_luck
+    preheader = (
+        f"{result.solar_date} {result.weekday} · {result.lunar_date} · "
+        f"{result.level_short} · {officer_line(result)}"
     )
+    path_badge = html.escape(result.day_path or result.level_short)
+    path_is_good = "黄道" in (result.day_path or "")
+    path_bg = "#F0F5F1" if path_is_good else "#FAF1F0"
+    path_color = "#4E7A5A" if path_is_good else "#9B3D3D"
+
+    meta_lines = [
+        f"干支：{html.escape(result.ganzhi)}",
+        f"冲煞：{html.escape(result.zodiac_clash)}",
+        f"建除：{html.escape(officer_line(result))}",
+        f"吉凶：{html.escape(result.level_short)}",
+    ]
+    if result.level_name and result.level_name not in {"无", result.level_short}:
+        meta_lines.append(f"说明：{html.escape(result.level_name)}")
+    if result.directions:
+        meta_lines.append(f"方位：{html.escape(join_items(result.directions))}")
+    if result.fetal_god:
+        meta_lines.append(f"胎神：{html.escape(result.fetal_god)}")
+
+    meta_html = "".join(
+        (
+            f'<div style="margin-top:4px;font-size:15px;font-weight:500;line-height:1.5;'
+            f'color:#7A6C66;font-family:{FONT_SANS};word-break:break-word;">{line}</div>'
+        )
+        for line in meta_lines
+    )
+
+    good_body = (
+        f'<div style="color:#4E7A5A;font-size:14px;line-height:1.8;font-weight:500;'
+        f'font-family:{FONT_SANS};">{render_dense_lines(result.good_things)}</div>'
+    )
+    bad_body = (
+        f'<div style="color:#9B3D3D;font-size:14px;line-height:1.8;font-weight:500;'
+        f'font-family:{FONT_SANS};">{render_dense_lines(result.bad_things)}</div>'
+    )
+    gods_left = email_section_card("吉神", render_badges(result.good_gods, "info"), "#F8F3EA", "#6E6158")
+    gods_right = email_section_card("凶煞", render_badges(result.bad_gods, "warn"), "#F7EFE8", "#8A5D4D")
+    term_holiday = email_pair_row(
+        email_mini_card("节气", term_html_value(result)),
+        email_mini_card("节日", holiday_value),
+    )
+    yi_ji = (
+        email_section_card("宜", good_body, "#F0F5F1", "#4E7A5A")
+        + '<div style="height:12px;line-height:12px;font-size:0;">&nbsp;</div>'
+        + email_section_card("忌", bad_body, "#FAF1F0", "#9B3D3D")
+    )
+
+    hour_rows = []
+    for row in result.hour_luck:
+        kind = luck_kind(row["luck"])
+        if kind == "good":
+            luck_style = "background:#F0F5F1;color:#4E7A5A;"
+        elif kind == "bad":
+            luck_style = "background:#FAF1F0;color:#9B3D3D;"
+        else:
+            luck_style = "background:#F5EFE7;color:#7A6C66;"
+        hour_rows.append(
+            f"""
+            <tr>
+              <td width="42%" style="padding:11px 12px;border-bottom:1px solid #EFE6DA;
+                font-family:{FONT_SANS};color:#3E3836;font-size:14px;">{html.escape(row['slot'])}</td>
+              <td width="33%" style="padding:11px 12px;border-bottom:1px solid #EFE6DA;
+                font-family:{FONT_SANS};color:#3E3836;font-size:14px;">{html.escape(row['ganzhi'])}</td>
+              <td width="25%" style="padding:11px 12px;border-bottom:1px solid #EFE6DA;
+                font-family:{FONT_SANS};color:#3E3836;font-size:14px;">
+                <span style="display:inline-block;min-width:42px;text-align:center;padding:4px 10px;
+                  border-radius:999px;font-weight:700;{luck_style}">{html.escape(row['luck'])}</span>
+              </td>
+            </tr>
+            """
+        )
+    hour_rows_html = "".join(hour_rows)
 
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="x-ua-compatible" content="ie=edge" />
   <title>今日黄历</title>
-  <style>
-    body {{
-      margin: 0;
-      padding: 0;
-      background: #ffffff;
-      color: #3e3836;
-      font-size: 15px;
-      line-height: 1.7;
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-    }}
-    body, table, td, div, p, span, a {{
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-    }}
-    table {{ border-collapse: collapse; border-spacing: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
-    .page {{ width: 100%; background: #ffffff; padding: 24px 0; }}
-    .container {{ width: 100%; max-width: 860px; margin: 0 auto; }}
-    .hero {{
-      background: #fdf9f1;
-      background-image: linear-gradient(135deg, #fdf9f1 0%, #f7efe2 56%, #f3eadf 100%);
-      border: 1px solid #eadfce;
-      border-radius: 22px;
-      overflow: hidden;
-      color: #3e3836;
-      box-shadow: 0 12px 30px rgba(110, 84, 58, 0.10);
-    }}
-    .hero-inner {{
-      padding: 24px;
-      background-color: rgba(255,255,255,0.24);
-    }}
-    .hero-main {{
-      margin: 0;
-      font-size: 24px;
-      line-height: 1.25;
-      font-weight: 600;
-      color: #3e3836;
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-      text-shadow: 0 1px 0 rgba(255,255,255,0.42);
-    }}
-    .hero-sub {{
-      margin: 6px 0 0;
-      font-size: 28px;
-      line-height: 1.3;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      color: #9b3d3d;
-      font-family: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif CJK SC', 'Noto Serif SC', serif;
-      text-shadow: 0 1px 0 rgba(255,255,255,0.42);
-    }}
-    .meta-lines {{ margin-top: 10px; }}
-    .meta-line {{
-      margin-top: 4px;
-      font-size: 16px;
-      font-weight: 500;
-      line-height: 1.45;
-      color: #7a6c66;
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }}
-    .spacer {{ height: 16px; line-height: 16px; }}
-    .card {{
-      background: #ffffff;
-      border: 1px solid #ece3d6;
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
-    }}
-    .card-inner {{
-      padding: 18px;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }}
-    .label {{ color: #7a6c66; font-size: 13px; margin-bottom: 6px; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; }}
-    .value {{
-      font-size: 16px;
-      font-weight: 600;
-      color: #3e3836;
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-      line-height: 1.55;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }}
-    .pair-table {{
-      width: 100%;
-      table-layout: fixed;
-      border-collapse: separate;
-      border-spacing: 0;
-    }}
-    .pair-grid {{
-      width: 100%;
-      table-layout: fixed;
-      border-collapse: separate;
-      border-spacing: 0;
-    }}
-    .pair-col {{
-      vertical-align: top;
-      background: #ffffff;
-      border: 1px solid #ece3d6;
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
-    }}
-    .pair-gap {{
-      width: 14px;
-      font-size: 0;
-      line-height: 0;
-    }}
-    .pair-card,
-    .pair-panel {{
-      width: 100%;
-      box-sizing: border-box;
-      border-collapse: separate;
-      border-spacing: 0;
-      background: #ffffff;
-      border: 1px solid #ece3d6;
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
-    }}
-    .pair-panel-inner {{
-      padding: 18px;
-      vertical-align: top;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }}
-    .pair-head {{
-      padding: 12px 16px;
-      font-size: 16px;
-      font-weight: 700;
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-      border-bottom: 1px solid #efe6da;
-    }}
-    .pair-head.good {{ background: #f0f5f1; color: #4e7a5a; }}
-    .pair-head.bad {{ background: #faf1f0; color: #9b3d3d; }}
-    .pair-head.info {{ background: #f8f3ea; color: #6e6158; }}
-    .pair-head.warn {{ background: #f7efe8; color: #8a5d4d; }}
-    .pair-body {{
-      padding: 16px;
-      vertical-align: top;
-      overflow: hidden;
-    }}
-    .dense-list {{
-      font-size: 14px;
-      line-height: 1.75;
-      word-break: break-word;
-      font-weight: 500;
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-    }}
-    .dense-list.good {{ color: #4e7a5a; }}
-    .dense-list.bad {{ color: #9b3d3d; }}
-    .tags {{ font-size: 0; }}
-    .tag {{
-      display: inline-block;
-      margin: 0 8px 8px 0;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 13px;
-      line-height: 1.4;
-      border: 1px solid transparent;
-      max-width: 100%;
-      white-space: normal;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif;
-    }}
-    .tag-good {{ background: #f0f5f1; color: #4e7a5a; border-color: #dbe8df; }}
-    .tag-bad {{ background: #faf1f0; color: #9b3d3d; border-color: #efd6d2; }}
-    .tag-info {{ background: #f8f3ea; color: #6e6158; border-color: #e9ddd0; }}
-    .tag-warn {{ background: #f8efe7; color: #8a5d4d; border-color: #ead8c9; }}
-    .tag-muted {{ background: #f5efe7; color: #7a6c66; border-color: #e7ddd1; }}
-    .section-title {{ font-size: 18px; font-weight: 700; color: #3e3836; margin: 0 0 12px; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; }}
-    .time-table {{
-      width: 100%;
-      background: #ffffff;
-      border: 1px solid #ece3d6;
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 10px 28px rgba(92, 71, 52, 0.08);
-    }}
-    .time-table th,
-    .time-table td {{ padding: 12px 14px; border-bottom: 1px solid #efe6da; text-align: left; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; color: #3e3836; }}
-    .time-table th {{ background: #f8f4ee; color: #7a6c66; font-size: 13px; font-weight: 600; }}
-    .time-table tr:last-child td {{ border-bottom: none; }}
-    .luck {{ display: inline-block; min-width: 42px; text-align: center; padding: 4px 10px; border-radius: 999px; font-weight: 700; }}
-    .luck.good {{ background: #f0f5f1; color: #4e7a5a; }}
-    .luck.bad {{ background: #faf1f0; color: #9b3d3d; }}
-    .footer {{ color: #8d7f77; font-size: 12px; text-align: center; padding: 10px 0 0; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', Arial, sans-serif; }}
-
-    @media only screen and (max-width: 700px) {{
-      .page {{ padding: 12px 0 !important; }}
-      .hero-inner {{ padding: 18px !important; }}
-      .hero-main {{ font-size: 20px !important; }}
-      .hero-sub {{ font-size: 24px !important; line-height: 1.28 !important; }}
-      .meta-line {{ font-size: 15px !important; }}
-      .pair-grid.mobile-stack,
-      .pair-grid.mobile-stack tbody,
-      .pair-grid.mobile-stack tr,
-      .pair-grid.mobile-stack td {{
-        display: block !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-      }}
-      .pair-grid.mobile-stack td.pair-gap {{
-        display: none !important;
-      }}
-      .pair-grid.mobile-stack td.pair-col.first {{
-        margin-bottom: 10px;
-      }}
-      .pair-panel-inner,
-      .card-inner,
-      .pair-body {{ padding: 14px !important; }}
-      .pair-head {{ padding: 10px 14px !important; }}
-      .time-table th,
-      .time-table td {{ padding: 10px 10px !important; font-size: 13px; }}
-    }}
+  <!--[if mso]>
+  <style type="text/css">
+    table, td, div, span, p {{ font-family: Arial, sans-serif !important; }}
   </style>
+  <![endif]-->
 </head>
-<body style="margin:0;padding:0;background:#FFFFFF;color:#3E3836;font-size:15px;line-height:1.7;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">
-  <table role="presentation" class="page" width="100%" style="width:100%;background:#FFFFFF;padding:24px 0;">
+<body style="margin:0;padding:0;background:#FFFFFF;color:#3E3836;font-size:15px;line-height:1.7;
+  font-family:{FONT_SANS};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;
+    overflow:hidden;mso-hide:all;">
+    {html.escape(preheader)}
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+    style="width:100%;background:#FFFFFF;border-collapse:collapse;">
     <tr>
-      <td align="center">
-        <table role="presentation" class="container" width="100%">
+      <td align="center" style="padding:20px 12px;background:#FFFFFF;">
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+          style="width:100%;max-width:640px;border-collapse:collapse;">
           <tr>
             <td>
-              <table role="presentation" class="hero" width="100%" style="background:#FDF9F1;background-image:linear-gradient(135deg,#FDF9F1 0%,#F7EFE2 56%,#F3EADF 100%);border:1px solid #EADFCE;border-radius:22px;overflow:hidden;color:#3E3836;box-shadow:0 12px 30px rgba(110,84,58,0.10);">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                bgcolor="#FDF9F1"
+                style="width:100%;background:#FDF9F1;border:1px solid #EADFCE;border-collapse:separate;">
                 <tr>
-                  <td class="hero-inner" style="padding:24px;background-color:rgba(255,255,255,0.24);">
-                    <div class="hero-main" style="margin:0;font-size:24px;line-height:1.25;font-weight:600;color:#3E3836;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;text-shadow:0 1px 0 rgba(255,255,255,0.42);">{html.escape(result.solar_date)} {html.escape(result.weekday)}</div>
-                    <div class="hero-sub" style="margin:6px 0 0;font-size:28px;line-height:1.3;font-weight:700;letter-spacing:0.02em;color:#9B3D3D;font-family:'Songti SC','STSong','SimSun','Noto Serif CJK SC','Noto Serif SC',serif;text-shadow:0 1px 0 rgba(255,255,255,0.42);">{html.escape(result.lunar_date)}</div>
-                    <div class="meta-lines">
-                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">干支：{html.escape(result.ganzhi)}</div>
-                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">冲煞：{html.escape(result.zodiac_clash)}</div>
-                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">建除十二神：{html.escape(result.officer12)}</div>
-                      <div class="meta-line" style="margin-top:4px;font-size:16px;font-weight:500;line-height:1.45;color:#7A6C66;font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif;">吉凶等级：{html.escape(result.level_name)}</div>
+                  <td style="padding:22px 20px;font-family:{FONT_SANS};">
+                    <div style="margin:0;font-size:22px;line-height:1.3;font-weight:600;color:#3E3836;
+                      font-family:{FONT_SANS};">
+                      {html.escape(result.solar_date)} {html.escape(result.weekday)}
+                    </div>
+                    <div style="margin:8px 0 0;font-size:26px;line-height:1.35;font-weight:700;
+                      letter-spacing:0.02em;color:#9B3D3D;font-family:{FONT_SERIF};">
+                      {html.escape(result.lunar_date)}
+                    </div>
+                    <div style="margin-top:12px;">
+                      <span style="display:inline-block;padding:5px 12px;border-radius:999px;
+                        background:{path_bg};color:{path_color};font-size:13px;font-weight:700;
+                        font-family:{FONT_SANS};">{path_badge}</span>
+                    </div>
+                    <div style="margin-top:10px;">
+                      {meta_html}
                     </div>
                   </td>
                 </tr>
@@ -534,92 +545,69 @@ def render_html(result: CalendarResult) -> str:
             </td>
           </tr>
 
-          <tr><td class="spacer">&nbsp;</td></tr>
+          {email_spacer(14)}
 
           <tr>
             <td>
-              <table role="presentation" class="pair-grid mobile-stack" width="100%">
+              {term_holiday}
+            </td>
+          </tr>
+
+          {email_spacer(14)}
+
+          <tr>
+            <td>
+              {yi_ji}
+            </td>
+          </tr>
+
+          {email_spacer(14)}
+
+          <tr>
+            <td>
+              {email_pair_row(gods_left, gods_right)}
+            </td>
+          </tr>
+
+          {email_spacer(18)}
+
+          <tr>
+            <td style="font-size:17px;font-weight:700;color:#3E3836;font-family:{FONT_SANS};
+              padding:0 0 10px;">
+              时辰吉凶
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                style="width:100%;background:#FFFFFF;border:1px solid #ECE3D6;border-collapse:separate;">
                 <tr>
-                  <td class="pair-col first">
-                    <div class="pair-panel-inner"><div class="label">节气</div><div class="value">{term_value}</div></div>
-                  </td>
-                  <td class="pair-gap">&nbsp;</td>
-                  <td class="pair-col last">
-                    <div class="pair-panel-inner"><div class="label">节日</div><div class="value">{holiday_value}</div></div>
-                  </td>
+                  <th align="left" width="42%" bgcolor="#F8F4EE"
+                    style="padding:11px 12px;background:#F8F4EE;color:#7A6C66;font-size:13px;
+                    font-weight:600;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;text-align:left;">
+                    时段
+                  </th>
+                  <th align="left" width="33%" bgcolor="#F8F4EE"
+                    style="padding:11px 12px;background:#F8F4EE;color:#7A6C66;font-size:13px;
+                    font-weight:600;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;text-align:left;">
+                    时辰
+                  </th>
+                  <th align="left" width="25%" bgcolor="#F8F4EE"
+                    style="padding:11px 12px;background:#F8F4EE;color:#7A6C66;font-size:13px;
+                    font-weight:600;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;text-align:left;">
+                    吉凶
+                  </th>
                 </tr>
-              </table>
-            </td>
-          </tr>
-
-          <tr><td class="spacer">&nbsp;</td></tr>
-
-          <tr>
-            <td>
-              <table role="presentation" class="pair-card" width="100%">
-                <tr><td class="pair-head good">宜</td></tr>
-                <tr><td class="pair-body"><div class="tags">{render_badges(result.good_things, 'good')}</div></td></tr>
-              </table>
-            </td>
-          </tr>
-
-          <tr><td class="spacer">&nbsp;</td></tr>
-
-          <tr>
-            <td>
-              <table role="presentation" class="pair-card" width="100%">
-                <tr><td class="pair-head bad">忌</td></tr>
-                <tr><td class="pair-body"><div class="tags">{render_badges(result.bad_things, 'bad')}</div></td></tr>
-              </table>
-            </td>
-          </tr>
-
-          <tr><td class="spacer">&nbsp;</td></tr>
-
-          <tr>
-            <td>
-              <table role="presentation" class="pair-grid mobile-stack" width="100%">
-                <tr>
-                  <td class="first" style="vertical-align:top;">
-                    <table role="presentation" class="pair-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr><td class="pair-head info">吉神</td></tr>
-                      <tr><td class="pair-body"><div class="tags">{render_badges(result.good_gods, 'info')}</div></td></tr>
-                    </table>
-                  </td>
-                  <td class="pair-gap">&nbsp;</td>
-                  <td class="last" style="vertical-align:top;">
-                    <table role="presentation" class="pair-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr><td class="pair-head warn">凶煞</td></tr>
-                      <tr><td class="pair-body"><div class="tags">{render_badges(result.bad_gods, 'warn')}</div></td></tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <tr><td class="spacer">&nbsp;</td></tr>
-
-          <tr>
-            <td>
-              <div class="section-title">时辰吉凶</div>
-              <table role="presentation" class="time-table" width="100%">
-                <thead>
-                  <tr>
-                    <th>时段</th>
-                    <th>时辰</th>
-                    <th>吉凶</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {hour_rows}
-                </tbody>
+                {hour_rows_html}
               </table>
             </td>
           </tr>
 
           <tr>
-            <td class="footer">Generated with cnlunar · Timezone: {TIMEZONE_NAME}</td>
+            <td style="color:#8D7F77;font-size:12px;text-align:center;padding:16px 0 4px;
+              font-family:{FONT_SANS};">
+              Generated with cnlunar · Timezone: {TIMEZONE_NAME}
+            </td>
           </tr>
         </table>
       </td>
@@ -718,7 +706,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate and optionally email the daily Chinese almanac")
     parser.add_argument("--date", help="可选日期，支持 YYYY-MM-DD 或 YYYY-MM-DD HH:MM")
     parser.add_argument("--send-email", action="store_true", help="发送 HTML 邮件")
-    parser.add_argument("--save-dir", default="dist", help="输出目录，默认 dist")
+    parser.add_argument("--save-dir", default="dist", help="输出目录，默认 dist；传空字符串则不保存")
     parser.add_argument(
         "--stdout-format",
         choices=["text", "markdown"],
