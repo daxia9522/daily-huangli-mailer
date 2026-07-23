@@ -362,13 +362,15 @@ def email_spacer(height: int = 16) -> str:
     )
 
 
-def email_section_card(title: str, body_html: str, head_bg: str, head_color: str) -> str:
+def email_section_inner(title: str, body_html: str, head_bg: str, head_color: str, radius: int = 16) -> str:
+    # No outer border here — caller paints border on the stretching cell.
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-  style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;">
+  style="width:100%;border-collapse:separate;">
   <tr>
     <td bgcolor="{head_bg}" style="padding:12px 16px;background:{head_bg};color:{head_color};
-      font-size:16px;font-weight:700;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;">
+      font-size:16px;font-weight:700;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;
+      border-radius:{radius}px {radius}px 0 0;">
       {html.escape(title)}
     </td>
   </tr>
@@ -382,26 +384,53 @@ def email_section_card(title: str, body_html: str, head_bg: str, head_color: str
 """
 
 
-def email_pair_row(left_html: str, right_html: str) -> str:
-    # Fixed 50/50 + padding gap. Nested tables only; no CSS-only column widths.
+def email_section_card(title: str, body_html: str, head_bg: str, head_color: str) -> str:
+    # Full-width single card with its own rounded border.
+    radius = 16
     return f"""
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;
+  border-radius:{radius}px;overflow:hidden;">
   <tr>
-    <td width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 6px 0 0;">
-      {left_html}
-    </td>
-    <td width="50%" valign="top" style="width:50%;vertical-align:top;padding:0 0 0 6px;">
-      {right_html}
+    <td style="padding:0;border-radius:{radius}px;overflow:hidden;">
+      {email_section_inner(title, body_html, head_bg, head_color, radius=radius)}
     </td>
   </tr>
 </table>
 """
 
 
-def email_mini_card(label: str, value_html: str) -> str:
+def email_pair_cells(left_inner: str, right_inner: str, *, radius: int = 16) -> str:
+    """Equal-height dual cards: border/radius on the same-row outer tds.
+
+    Table row cells stretch to the taller sibling, so both chrome boxes match height
+    even when content length differs (节气 vs 节日, 吉神 vs 凶煞).
+    """
+    cell_style = (
+        f"width:50%;vertical-align:top;background:#FFFFFF;border:1px solid #ECE3D6;"
+        f"border-radius:{radius}px;overflow:hidden;"
+    )
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-  style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;">
+  style="width:100%;border-collapse:separate;border-spacing:0;">
+  <tr>
+    <td width="50%" valign="top" bgcolor="#FFFFFF"
+      style="{cell_style}padding:0;">
+      {left_inner}
+    </td>
+    <td width="12" style="width:12px;font-size:0;line-height:0;">&nbsp;</td>
+    <td width="50%" valign="top" bgcolor="#FFFFFF"
+      style="{cell_style}padding:0;">
+      {right_inner}
+    </td>
+  </tr>
+</table>
+"""
+
+
+def email_mini_inner(label: str, value_html: str) -> str:
+    return f"""
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
   <tr>
     <td style="padding:14px 16px;font-family:{FONT_SANS};">
       <div style="color:#7A6C66;font-size:13px;margin:0 0 6px;font-family:{FONT_SANS};">{html.escape(label)}</div>
@@ -453,11 +482,13 @@ def render_html(result: CalendarResult) -> str:
         f'<div style="color:#9B3D3D;font-size:14px;line-height:1.8;font-weight:500;'
         f'font-family:{FONT_SANS};">{render_dense_lines(result.bad_things)}</div>'
     )
-    gods_left = email_section_card("吉神", render_badges(result.good_gods, "info"), "#F8F3EA", "#6E6158")
-    gods_right = email_section_card("凶煞", render_badges(result.bad_gods, "warn"), "#F7EFE8", "#8A5D4D")
-    term_holiday = email_pair_row(
-        email_mini_card("节气", term_html_value(result)),
-        email_mini_card("节日", holiday_value),
+    term_holiday = email_pair_cells(
+        email_mini_inner("节气", term_html_value(result)),
+        email_mini_inner("节日", holiday_value),
+    )
+    gods_pair = email_pair_cells(
+        email_section_inner("吉神", render_badges(result.good_gods, "info"), "#F8F3EA", "#6E6158"),
+        email_section_inner("凶煞", render_badges(result.bad_gods, "warn"), "#F7EFE8", "#8A5D4D"),
     )
     yi_ji = (
         email_section_card("宜", good_body, "#F0F5F1", "#4E7A5A")
@@ -520,9 +551,10 @@ def render_html(result: CalendarResult) -> str:
             <td>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
                 bgcolor="#FDF9F1"
-                style="width:100%;background:#FDF9F1;border:1px solid #EADFCE;border-collapse:separate;">
+                style="width:100%;background:#FDF9F1;border:1px solid #EADFCE;border-collapse:separate;
+                border-radius:18px;overflow:hidden;">
                 <tr>
-                  <td style="padding:22px 20px;font-family:{FONT_SANS};">
+                  <td style="padding:22px 20px;font-family:{FONT_SANS};border-radius:18px;">
                     <div style="margin:0;font-size:22px;line-height:1.3;font-weight:600;color:#3E3836;
                       font-family:{FONT_SANS};">
                       {html.escape(result.solar_date)} {html.escape(result.weekday)}
@@ -565,7 +597,7 @@ def render_html(result: CalendarResult) -> str:
 
           <tr>
             <td>
-              {email_pair_row(gods_left, gods_right)}
+              {gods_pair}
             </td>
           </tr>
 
@@ -580,7 +612,8 @@ def render_html(result: CalendarResult) -> str:
           <tr>
             <td>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                style="width:100%;background:#FFFFFF;border:1px solid #ECE3D6;border-collapse:separate;">
+                style="width:100%;background:#FFFFFF;border:1px solid #ECE3D6;border-collapse:separate;
+                border-radius:16px;overflow:hidden;">
                 <tr>
                   <th align="left" width="42%" bgcolor="#F8F4EE"
                     style="padding:11px 12px;background:#F8F4EE;color:#7A6C66;font-size:13px;
