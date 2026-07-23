@@ -363,10 +363,10 @@ def email_spacer(height: int = 16) -> str:
 
 
 def email_section_inner(title: str, body_html: str, head_bg: str, head_color: str, radius: int = 16) -> str:
-    # No outer border here — caller paints border on the stretching cell.
+    # Content only. Outer pair/full card paints border + radius on the stretching cell.
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-  style="width:100%;border-collapse:separate;">
+  style="width:100%;border-collapse:collapse;">
   <tr>
     <td bgcolor="{head_bg}" style="padding:12px 16px;background:{head_bg};color:{head_color};
       font-size:16px;font-weight:700;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;
@@ -385,14 +385,15 @@ def email_section_inner(title: str, body_html: str, head_bg: str, head_color: st
 
 
 def email_section_card(title: str, body_html: str, head_bg: str, head_color: str) -> str:
-    # Full-width single card with its own rounded border.
+    # Full-width single card with rounded border on the outer table.
     radius = 16
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  bgcolor="#FFFFFF"
   style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;
-  border-radius:{radius}px;overflow:hidden;">
+  border-radius:{radius}px;">
   <tr>
-    <td style="padding:0;border-radius:{radius}px;overflow:hidden;">
+    <td style="padding:0;border-radius:{radius}px;">
       {email_section_inner(title, body_html, head_bg, head_color, radius=radius)}
     </td>
   </tr>
@@ -401,26 +402,25 @@ def email_section_card(title: str, body_html: str, head_bg: str, head_color: str
 
 
 def email_pair_cells(left_inner: str, right_inner: str, *, radius: int = 16) -> str:
-    """Equal-height dual cards: border/radius on the same-row outer tds.
+    """Equal-height dual cards for Gmail-friendly HTML email.
 
-    Table row cells stretch to the taller sibling, so both chrome boxes match height
-    even when content length differs (节气 vs 节日, 吉神 vs 凶煞).
+    Critical details:
+    - Border + radius live on the same-row outer <td>s (they stretch together).
+    - Gap uses border-spacing, not a third spacer column (avoids 50%+50%+N overflow).
+    - No overflow:hidden on those tds (Gmail may shrink-wrap and kill equal height).
     """
     cell_style = (
-        f"width:50%;vertical-align:top;background:#FFFFFF;border:1px solid #ECE3D6;"
-        f"border-radius:{radius}px;overflow:hidden;"
+        f"width:50%;vertical-align:top;background:#FFFFFF;"
+        f"border:1px solid #ECE3D6;border-radius:{radius}px;"
     )
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-  style="width:100%;border-collapse:separate;border-spacing:0;">
+  style="width:100%;border-collapse:separate;border-spacing:12px 0;">
   <tr>
-    <td width="50%" valign="top" bgcolor="#FFFFFF"
-      style="{cell_style}padding:0;">
+    <td width="50%" valign="top" bgcolor="#FFFFFF" style="{cell_style}">
       {left_inner}
     </td>
-    <td width="12" style="width:12px;font-size:0;line-height:0;">&nbsp;</td>
-    <td width="50%" valign="top" bgcolor="#FFFFFF"
-      style="{cell_style}padding:0;">
+    <td width="50%" valign="top" bgcolor="#FFFFFF" style="{cell_style}">
       {right_inner}
     </td>
   </tr>
@@ -430,9 +430,10 @@ def email_pair_cells(left_inner: str, right_inner: str, *, radius: int = 16) -> 
 
 def email_mini_inner(label: str, value_html: str) -> str:
     return f"""
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0" border="0"
+  style="width:100%;height:100%;border-collapse:collapse;">
   <tr>
-    <td style="padding:14px 16px;font-family:{FONT_SANS};">
+    <td valign="top" style="padding:14px 16px;font-family:{FONT_SANS};vertical-align:top;">
       <div style="color:#7A6C66;font-size:13px;margin:0 0 6px;font-family:{FONT_SANS};">{html.escape(label)}</div>
       <div style="color:#3E3836;font-size:15px;font-weight:600;line-height:1.55;font-family:{FONT_SANS};
         word-break:break-word;">{value_html}</div>
