@@ -362,15 +362,22 @@ def email_spacer(height: int = 16) -> str:
     )
 
 
-def email_section_inner(title: str, body_html: str, head_bg: str, head_color: str, radius: int = 16) -> str:
-    # Content only. Outer pair/full card paints border + radius on the stretching cell.
+def email_section_inner(
+    title: str,
+    body_html: str,
+    head_bg: str,
+    head_color: str,
+    *,
+    head_radius: str = "16px 16px 0 0",
+) -> str:
+    # Content only. Outer card/pair shell owns the full border + outer radius.
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
   style="width:100%;border-collapse:collapse;">
   <tr>
     <td bgcolor="{head_bg}" style="padding:12px 16px;background:{head_bg};color:{head_color};
       font-size:16px;font-weight:700;font-family:{FONT_SANS};border-bottom:1px solid #EFE6DA;
-      border-radius:{radius}px {radius}px 0 0;">
+      border-radius:{head_radius};">
       {html.escape(title)}
     </td>
   </tr>
@@ -385,7 +392,7 @@ def email_section_inner(title: str, body_html: str, head_bg: str, head_color: st
 
 
 def email_section_card(title: str, body_html: str, head_bg: str, head_color: str) -> str:
-    # Full-width single card with rounded border on the outer table.
+    # Full-width single card; outer table owns border + radius for consistent width.
     radius = 16
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -394,7 +401,7 @@ def email_section_card(title: str, body_html: str, head_bg: str, head_color: str
   border-radius:{radius}px;">
   <tr>
     <td style="padding:0;border-radius:{radius}px;">
-      {email_section_inner(title, body_html, head_bg, head_color, radius=radius)}
+      {email_section_inner(title, body_html, head_bg, head_color, head_radius=f"{radius}px {radius}px 0 0")}
     </td>
   </tr>
 </table>
@@ -402,25 +409,27 @@ def email_section_card(title: str, body_html: str, head_bg: str, head_color: str
 
 
 def email_pair_cells(left_inner: str, right_inner: str, *, radius: int = 16) -> str:
-    """Equal-height dual cards for Gmail-friendly HTML email.
+    """Equal-height dual columns that match full-width card outer edges.
 
-    Critical details:
-    - Border + radius live on the same-row outer <td>s (they stretch together).
-    - Gap uses border-spacing, not a third spacer column (avoids 50%+50%+N overflow).
-    - No overflow:hidden on those tds (Gmail may shrink-wrap and kill equal height).
+    Gmail-safe pattern:
+    - ONE outer shell at width:100% (same as 宜/忌/header cards).
+    - Internal 50/50 split; row cells stretch together => equal height.
+    - No border-spacing (it insets both sides and makes the pair narrower).
+    - Center divider instead of a gap that shrinks total width.
     """
-    cell_style = (
-        f"width:50%;vertical-align:top;background:#FFFFFF;"
-        f"border:1px solid #ECE3D6;border-radius:{radius}px;"
-    )
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-  style="width:100%;border-collapse:separate;border-spacing:12px 0;">
+  bgcolor="#FFFFFF"
+  style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;
+  border-radius:{radius}px;table-layout:fixed;">
   <tr>
-    <td width="50%" valign="top" bgcolor="#FFFFFF" style="{cell_style}">
+    <td width="50%" valign="top" bgcolor="#FFFFFF"
+      style="width:50%;vertical-align:top;background:#FFFFFF;padding:0;
+      border-right:1px solid #ECE3D6;">
       {left_inner}
     </td>
-    <td width="50%" valign="top" bgcolor="#FFFFFF" style="{cell_style}">
+    <td width="50%" valign="top" bgcolor="#FFFFFF"
+      style="width:50%;vertical-align:top;background:#FFFFFF;padding:0;">
       {right_inner}
     </td>
   </tr>
@@ -430,8 +439,8 @@ def email_pair_cells(left_inner: str, right_inner: str, *, radius: int = 16) -> 
 
 def email_mini_inner(label: str, value_html: str) -> str:
     return f"""
-<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0" border="0"
-  style="width:100%;height:100%;border-collapse:collapse;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  style="width:100%;border-collapse:collapse;">
   <tr>
     <td valign="top" style="padding:14px 16px;font-family:{FONT_SANS};vertical-align:top;">
       <div style="color:#7A6C66;font-size:13px;margin:0 0 6px;font-family:{FONT_SANS};">{html.escape(label)}</div>
@@ -488,8 +497,20 @@ def render_html(result: CalendarResult) -> str:
         email_mini_inner("节日", holiday_value),
     )
     gods_pair = email_pair_cells(
-        email_section_inner("吉神", render_badges(result.good_gods, "info"), "#F8F3EA", "#6E6158"),
-        email_section_inner("凶煞", render_badges(result.bad_gods, "warn"), "#F7EFE8", "#8A5D4D"),
+        email_section_inner(
+            "吉神",
+            render_badges(result.good_gods, "info"),
+            "#F8F3EA",
+            "#6E6158",
+            head_radius="15px 0 0 0",
+        ),
+        email_section_inner(
+            "凶煞",
+            render_badges(result.bad_gods, "warn"),
+            "#F7EFE8",
+            "#8A5D4D",
+            head_radius="0 15px 0 0",
+        ),
     )
     yi_ji = (
         email_section_card("宜", good_body, "#F0F5F1", "#4E7A5A")
