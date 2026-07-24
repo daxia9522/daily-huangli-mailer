@@ -409,27 +409,30 @@ def email_section_card(title: str, body_html: str, head_bg: str, head_color: str
 
 
 def email_pair_cells(left_inner: str, right_inner: str, *, radius: int = 16) -> str:
-    """Equal-height dual columns that match full-width card outer edges.
+    """Two separate equal-height cards, outer edges aligned with full-width cards.
 
     Gmail-safe pattern:
-    - ONE outer shell at width:100% (same as 宜/忌/header cards).
-    - Internal 50/50 split; row cells stretch together => equal height.
-    - No border-spacing (it insets both sides and makes the pair narrower).
-    - Center divider instead of a gap that shrinks total width.
+    - TWO independent cards (each TD has its own border + radius), not one shell.
+    - Same table row => both card cells stretch to equal height.
+    - Fixed layout + 49% / 2% / 49% keeps total width = 100% (no border-spacing inset).
+    - Middle column is only a visual gap, not a divider line inside one card.
     """
+    card_style = (
+        f"vertical-align:top;background:#FFFFFF;padding:0;"
+        f"border:1px solid #ECE3D6;border-radius:{radius}px;"
+    )
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-  bgcolor="#FFFFFF"
-  style="width:100%;border-collapse:separate;background:#FFFFFF;border:1px solid #ECE3D6;
-  border-radius:{radius}px;table-layout:fixed;">
+  style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;">
   <tr>
-    <td width="50%" valign="top" bgcolor="#FFFFFF"
-      style="width:50%;vertical-align:top;background:#FFFFFF;padding:0;
-      border-right:1px solid #ECE3D6;">
+    <td width="49%" valign="top" bgcolor="#FFFFFF"
+      style="width:49%;{card_style}">
       {left_inner}
     </td>
-    <td width="50%" valign="top" bgcolor="#FFFFFF"
-      style="width:50%;vertical-align:top;background:#FFFFFF;padding:0;">
+    <td width="2%" aria-hidden="true"
+      style="width:2%;padding:0;margin:0;font-size:0;line-height:0;border:0;">&nbsp;</td>
+    <td width="49%" valign="top" bgcolor="#FFFFFF"
+      style="width:49%;{card_style}">
       {right_inner}
     </td>
   </tr>
@@ -502,14 +505,14 @@ def render_html(result: CalendarResult) -> str:
             render_badges(result.good_gods, "info"),
             "#F8F3EA",
             "#6E6158",
-            head_radius="15px 0 0 0",
+            head_radius="15px 15px 0 0",
         ),
         email_section_inner(
             "凶煞",
             render_badges(result.bad_gods, "warn"),
             "#F7EFE8",
             "#8A5D4D",
-            head_radius="0 15px 0 0",
+            head_radius="15px 15px 0 0",
         ),
     )
     yi_ji = (
