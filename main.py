@@ -14,12 +14,13 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import cnlunar
+from lunar_python import Solar
 
 TIMEZONE_NAME = "Asia/Shanghai"
 TIMEZONE = ZoneInfo(TIMEZONE_NAME)
+# 主流万年历：早子 + 十一时辰 + 夜子（13 段）
 HOUR_WINDOWS = [
-    "23:00-00:59",
+    "00:00-00:59",
     "01:00-02:59",
     "03:00-04:59",
     "05:00-06:59",
@@ -31,7 +32,10 @@ HOUR_WINDOWS = [
     "17:00-18:59",
     "19:00-20:59",
     "21:00-22:59",
+    "23:00-23:59",
 ]
+HOUR_RULE_NOTE = "时辰：早子 00:00-00:59，夜子 23:00-23:59 单列"
+SOURCE_NOTE = "数据：lunar-python（6tail）离线民用黄历，无外部 API"
 FONT_SANS = (
     "'PingFang SC','Hiragino Sans GB','Microsoft YaHei',"
     "'Noto Sans CJK SC','Noto Sans SC',Arial,sans-serif"
@@ -64,8 +68,11 @@ class CalendarResult:
     day_path: str
     level_name: str
     level_short: str
+    peng_taboo: str
     fetal_god: str
     directions: list[str]
+    star28: str
+    nayin: str
     good_gods: list[str]
     bad_gods: list[str]
     good_things: list[str]
@@ -115,35 +122,44 @@ def parse_target_datetime(raw: str | None) -> datetime:
     raise SystemExit("无法识别日期格式，请使用 YYYY-MM-DD 或 YYYY-MM-DD HH:MM")
 
 
-def build_lunar(dt: datetime):
-    return cnlunar.Lunar(dt.replace(tzinfo=None))
+def build_solar(dt: datetime) -> Solar:
+    local = dt.astimezone(TIMEZONE) if dt.tzinfo else dt.replace(tzinfo=TIMEZONE)
+    return Solar.fromYmdHms(
+        local.year, local.month, local.day, local.hour, local.minute, local.second
+    )
 
 
 def get_current_term(lunar_obj: Any, dt: datetime) -> TermInfo:
-    current_key = (dt.month, dt.day)
-    this_year_terms = sorted(lunar_obj.thisYearSolarTermsDic.items(), key=lambda item: item[1])
-    candidates = [(name, md) for name, md in this_year_terms if md <= current_key]
-    if candidates:
-        name, (month, day) = candidates[-1]
-        return TermInfo(name=name, date=f"{dt.year:04d}-{month:02d}-{day:02d}")
-
-    prev = build_lunar(datetime(dt.year - 1, 12, 31, 12, 0, tzinfo=dt.tzinfo))
-    prev_terms = sorted(prev.thisYearSolarTermsDic.items(), key=lambda item: item[1])
-    name, (month, day) = prev_terms[-1]
-    return TermInfo(name=name, date=f"{dt.year - 1:04d}-{month:02d}-{day:02d}")
+    current = lunar_obj.getCurrentJieQi()
+    if current is not None:
+        solar = current.getSolar()
+        return TermInfo(
+            name=str(current.getName()),
+            date=f"{solar.getYear():04d}-{solar.getMonth():02d}-{solar.getDay():02d}",
+        )
+    prev = lunar_obj.getPrevJieQi(True)
+    solar = prev.getSolar()
+    return TermInfo(
+        name=str(prev.getName()),
+        date=f"{solar.getYear():04d}-{solar.getMonth():02d}-{solar.getDay():02d}",
+    )
 
 
 def get_next_term(lunar_obj: Any) -> TermInfo:
-    year = lunar_obj.nextSolarTermYear
-    month, day = lunar_obj.nextSolarTermDate
-    return TermInfo(name=lunar_obj.nextSolarTerm, date=f"{year:04d}-{month:02d}-{day:02d}")
+    nxt = lunar_obj.getNextJieQi(True)
+    solar = nxt.getSolar()
+    return TermInfo(
+        name=str(nxt.getName()),
+        date=f"{solar.getYear():04d}-{solar.getMonth():02d}-{solar.getDay():02d}",
+    )
 
 
-def get_holidays(lunar_obj: Any) -> list[str]:
+def get_holidays(solar_obj: Any, lunar_obj: Any) -> list[str]:
     values = [
-        lunar_obj.get_legalHolidays(),
-        lunar_obj.get_otherHolidays(),
-        lunar_obj.get_otherLunarHolidays(),
+        solar_obj.getFestivals(),
+        solar_obj.getOtherFestivals(),
+        lunar_obj.getFestivals(),
+        lunar_obj.getOtherFestivals(),
     ]
     merged: list[str] = []
     for value in values:
@@ -158,47 +174,113 @@ def get_holidays(lunar_obj: Any) -> list[str]:
 
 
 def get_officer_fields(lunar_obj: Any) -> tuple[str, str, str]:
-    info = lunar_obj.get_today12DayOfficer()
-    if isinstance(info, (list, tuple)) and len(info) >= 3:
-        return f"{info[0]}日", str(info[1]), str(info[2])
-    return f"{lunar_obj.today12DayOfficer}日", "", ""
+    zhi = str(lunar_obj.getZhiXing() or "").strip()
+    star = str(lunar_obj.getDayTianShen() or "").strip()
+    path = str(lunar_obj.getDayTianShenType() or "").strip()
+    officer = f"{zhi}日" if zhi and not zhi.endswith("日") else (zhi or "无")
+    return officer, star, path
 
 
 def get_hour_luck(lunar_obj: Any) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    branches = list(lunar_obj.twohour8CharList[:12])
-    lucky = list(lunar_obj.get_twohourLuckyList()[:12])
-    for idx, (ganzhi, state) in enumerate(zip(branches, lucky, strict=False)):
-        rows.append({"slot": HOUR_WINDOWS[idx], "ganzhi": str(ganzhi), "luck": str(state)})
+    for idx, time_obj in enumerate(lunar_obj.getTimes()):
+        slot = HOUR_WINDOWS[idx] if idx < len(HOUR_WINDOWS) else f"时辰{idx + 1}"
+        luck = str(time_obj.getTianShenLuck() or "").strip() or "无"
+        rows.append({"slot": slot, "ganzhi": str(time_obj.getGanZhi()), "luck": luck})
     return rows
 
 
+def format_zodiac_clash(lunar_obj: Any) -> str:
+    animal = str(lunar_obj.getDayShengXiao() or "").strip()
+    chong = str(lunar_obj.getDayChongShengXiao() or "").strip()
+    sha = str(lunar_obj.getDaySha() or "").strip()
+    head = f"{animal}日冲{chong}" if animal and chong else str(lunar_obj.getDayChongDesc() or "无")
+    return f"{head}，煞{sha}" if sha else head
+
+
+def format_level_fields(lunar_obj: Any) -> tuple[str, str]:
+    path = str(lunar_obj.getDayTianShenType() or "").strip()
+    luck = str(lunar_obj.getDayTianShenLuck() or "").strip()
+    if path and luck:
+        short = f"{path}{luck}"
+        return short, f"{path}{luck}日"
+    if luck:
+        return luck, f"{luck}日"
+    if path:
+        return path, path
+    return "平", "无特别等第"
+
+
+def format_peng_taboo(lunar_obj: Any) -> str:
+    parts = [
+        str(lunar_obj.getPengZuGan() or "").strip(),
+        str(lunar_obj.getPengZuZhi() or "").strip(),
+    ]
+    parts = [p for p in parts if p]
+    return "；".join(parts) if parts else ""
+
+
+def format_directions(lunar_obj: Any) -> list[str]:
+    mapping = [
+        ("喜神", lunar_obj.getDayPositionXiDesc()),
+        ("财神", lunar_obj.getDayPositionCaiDesc()),
+        ("福神", lunar_obj.getDayPositionFuDesc()),
+        ("阳贵", lunar_obj.getDayPositionYangGuiDesc()),
+        ("阴贵", lunar_obj.getDayPositionYinGuiDesc()),
+    ]
+    result: list[str] = []
+    for label, value in mapping:
+        text = str(value or "").strip()
+        if text:
+            result.append(f"{label}{text}")
+    return result
+
+
+def format_star28(lunar_obj: Any) -> str:
+    xiu = str(lunar_obj.getXiu() or "").strip()
+    animal = str(lunar_obj.getAnimal() or "").strip()
+    luck = str(lunar_obj.getXiuLuck() or "").strip()
+    core = f"{xiu}{animal}".strip()
+    if not core:
+        return ""
+    return f"{core}（{luck}）" if luck else core
+
+
 def build_result(dt: datetime) -> CalendarResult:
-    lunar_obj = build_lunar(dt)
+    solar_obj = build_solar(dt)
+    lunar_obj = solar_obj.getLunar()
     officer12, day_star, day_path = get_officer_fields(lunar_obj)
-    level_name = str(lunar_obj.todayLevelName)
-    level_short = str(getattr(lunar_obj, "thingLevelName", "") or "").strip() or level_name
+    level_short, level_name = format_level_fields(lunar_obj)
+    month_cn = str(lunar_obj.getMonthInChinese())
+    month_label = month_cn if month_cn.endswith("月") else f"{month_cn}月"
     return CalendarResult(
         solar_date=dt.strftime("%Y-%m-%d"),
-        weekday=str(lunar_obj.weekDayCn),
-        lunar_date=f"{lunar_obj.lunarYearCn}年 {lunar_obj.lunarMonthCn}{lunar_obj.lunarDayCn}",
-        ganzhi=f"{lunar_obj.year8Char}年 {lunar_obj.month8Char}月 {lunar_obj.day8Char}日",
+        weekday=f"星期{solar_obj.getWeekInChinese()}",
+        lunar_date=f"{lunar_obj.getYearInChinese()}年 {month_label}{lunar_obj.getDayInChinese()}",
+        ganzhi=(
+            f"{lunar_obj.getYearInGanZhi()}年 "
+            f"{lunar_obj.getMonthInGanZhi()}月 "
+            f"{lunar_obj.getDayInGanZhi()}日"
+        ),
         current_term=get_current_term(lunar_obj, dt),
         next_term=get_next_term(lunar_obj),
-        today_term_exact=(str(lunar_obj.todaySolarTerms) != "无"),
-        holidays=get_holidays(lunar_obj),
-        zodiac_clash=str(lunar_obj.chineseZodiacClash),
+        today_term_exact=lunar_obj.getCurrentJieQi() is not None,
+        holidays=get_holidays(solar_obj, lunar_obj),
+        zodiac_clash=format_zodiac_clash(lunar_obj),
         officer12=officer12,
         day_star=day_star,
         day_path=day_path,
         level_name=level_name,
         level_short=level_short,
-        fetal_god=str(lunar_obj.get_fetalGod() or "").strip(),
-        directions=normalize_items(lunar_obj.get_luckyGodsDirection()),
-        good_gods=normalize_items(lunar_obj.goodGodName),
-        bad_gods=normalize_items(lunar_obj.badGodName),
-        good_things=normalize_items(lunar_obj.goodThing),
-        bad_things=normalize_items(lunar_obj.badThing),
+        peng_taboo=format_peng_taboo(lunar_obj),
+        fetal_god=str(lunar_obj.getDayPositionTai() or "").strip(),
+        directions=format_directions(lunar_obj),
+        star28=format_star28(lunar_obj),
+        nayin=str(lunar_obj.getDayNaYin() or "").strip(),
+        good_gods=normalize_items(lunar_obj.getDayJiShen()),
+        bad_gods=normalize_items(lunar_obj.getDayXiongSha()),
+        good_things=normalize_items(lunar_obj.getDayYi()),
+        bad_things=normalize_items(lunar_obj.getDayJi()),
         hour_luck=get_hour_luck(lunar_obj),
     )
 
@@ -262,6 +344,12 @@ def render_text(result: CalendarResult) -> str:
         lines.append(f"方位：{join_items(result.directions)}")
     if result.fetal_god:
         lines.append(f"胎神：{result.fetal_god}")
+    if result.peng_taboo:
+        lines.append(f"彭祖百忌：{result.peng_taboo}")
+    if result.nayin:
+        lines.append(f"纳音：{result.nayin}")
+    if result.star28:
+        lines.append(f"二十八宿：{result.star28}")
     lines.extend(
         [
             f"吉神：{join_items(result.good_gods)}",
@@ -273,6 +361,7 @@ def render_text(result: CalendarResult) -> str:
     )
     for row in result.hour_luck:
         lines.append(f"- {row['slot']} {row['ganzhi']} {row['luck']}")
+    lines.extend(["", HOUR_RULE_NOTE, SOURCE_NOTE])
     return "\n".join(lines)
 
 
@@ -286,6 +375,9 @@ def render_markdown(result: CalendarResult) -> str:
     holiday_line = f"- 节日：{join_items(result.holidays)}\n" if result.holidays else ""
     direction_line = f"- 方位：{join_items(result.directions)}\n" if result.directions else ""
     fetal_line = f"- 胎神：{result.fetal_god}\n" if result.fetal_god else ""
+    peng_line = f"- 彭祖百忌：{result.peng_taboo}\n" if result.peng_taboo else ""
+    nayin_line = f"- 纳音：{result.nayin}\n" if result.nayin else ""
+    star_line = f"- 二十八宿：{result.star28}\n" if result.star28 else ""
     parts = [
         "# 今日黄历",
         "",
@@ -299,6 +391,9 @@ def render_markdown(result: CalendarResult) -> str:
         f"- 吉凶：{result.level_short}",
         direction_line.rstrip(),
         fetal_line.rstrip(),
+        peng_line.rstrip(),
+        nayin_line.rstrip(),
+        star_line.rstrip(),
         "",
         "## 宜忌",
         "",
@@ -319,6 +414,7 @@ def render_markdown(result: CalendarResult) -> str:
     ]
     for row in result.hour_luck:
         parts.append(f"| {row['slot']} | {row['ganzhi']} | {row['luck']} |")
+    parts.extend(["", f"> {HOUR_RULE_NOTE}", f"> {SOURCE_NOTE}"])
     return "\n".join(line for line in parts if line is not None).strip() + "\n"
 
 
@@ -478,6 +574,12 @@ def render_html(result: CalendarResult) -> str:
         meta_lines.append(f"方位：{html.escape(join_items(result.directions))}")
     if result.fetal_god:
         meta_lines.append(f"胎神：{html.escape(result.fetal_god)}")
+    if result.peng_taboo:
+        meta_lines.append(f"彭祖百忌：{html.escape(result.peng_taboo)}")
+    if result.nayin:
+        meta_lines.append(f"纳音：{html.escape(result.nayin)}")
+    if result.star28:
+        meta_lines.append(f"二十八宿：{html.escape(result.star28)}")
 
     meta_html = "".join(
         (
@@ -664,7 +766,7 @@ def render_html(result: CalendarResult) -> str:
           <tr>
             <td style="color:#8D7F77;font-size:12px;text-align:center;padding:16px 0 4px;
               font-family:{FONT_SANS};">
-              Generated with cnlunar · Timezone: {TIMEZONE_NAME}
+              Generated with lunar-python · {html.escape(SOURCE_NOTE)} · {TIMEZONE_NAME}
             </td>
           </tr>
         </table>
@@ -690,6 +792,9 @@ def auto_detect_smtp(from_email: str, smtp_server: str, smtp_port: str) -> tuple
         "googlemail.com": ("smtp.gmail.com", 587),
         "qq.com": ("smtp.qq.com", 587),
         "163.com": ("smtp.163.com", 465),
+        "vip.163.com": ("smtp.163.com", 465),
+        "126.com": ("smtp.126.com", 465),
+        "yeah.net": ("smtp.yeah.net", 465),
         "outlook.com": ("smtp-mail.outlook.com", 587),
         "hotmail.com": ("smtp-mail.outlook.com", 587),
     }
@@ -760,11 +865,20 @@ def save_report(report: RenderedReport, save_dir: str) -> None:
     (dist / "today.html").write_text(report.html, encoding="utf-8")
 
 
+def resolve_save_dir(raw: str | None) -> str | None:
+    if raw is None:
+        return "dist"
+    value = raw.strip()
+    if not value or value.lower() in {"none", "-", "/dev/null"}:
+        return None
+    return value
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate and optionally email the daily Chinese almanac")
     parser.add_argument("--date", help="可选日期，支持 YYYY-MM-DD 或 YYYY-MM-DD HH:MM")
     parser.add_argument("--send-email", action="store_true", help="发送 HTML 邮件")
-    parser.add_argument("--save-dir", default="dist", help="输出目录，默认 dist；传空字符串则不保存")
+    parser.add_argument("--save-dir", default="dist", help="输出目录，默认 dist；none/- 表示不保存")
     parser.add_argument(
         "--stdout-format",
         choices=["text", "markdown"],
@@ -775,8 +889,9 @@ def main() -> int:
 
     result = build_result(parse_target_datetime(args.date))
     report = build_report(result)
-    if args.save_dir:
-        save_report(report, args.save_dir)
+    save_dir = resolve_save_dir(args.save_dir)
+    if save_dir:
+        save_report(report, save_dir)
     if args.send_email:
         send_email(report)
 
