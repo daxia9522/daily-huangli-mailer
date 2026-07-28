@@ -58,3 +58,7 @@ test_calendar_smoke.py
 ```bash
 python test_calendar_smoke.py
 ```
+
+## 致谢
+
+黄历数据基于 [6tail/lunar-python](https://github.com/6tail/lunar-python)（MIT）。

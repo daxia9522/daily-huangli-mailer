@@ -840,10 +840,7 @@ def render_html(result: CalendarResult) -> str:
           </tr>
 
           <tr>
-            <td style="color:#8D7F77;font-size:12px;text-align:center;padding:16px 0 4px;
-              font-family:{FONT_SANS};">
-              Generated with lunar-python · {html.escape(SOURCE_NOTE)} · {TIMEZONE_NAME}
-            </td>
+            <td style="padding:8px 0 0;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
         </table>
       </td>
