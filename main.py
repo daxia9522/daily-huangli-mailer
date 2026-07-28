@@ -551,43 +551,121 @@ def email_mini_inner(label: str, value_html: str) -> str:
 """
 
 
+
+def email_kv_row(label: str, value_html: str, *, last: bool = False) -> str:
+    border = "0" if last else "1px solid #EFE6DA"
+    return f"""
+<tr>
+  <td width="26%" valign="top"
+    style="width:26%;padding:9px 0;border-bottom:{border};color:#8D7F77;font-size:13px;
+    line-height:1.5;font-family:{FONT_SANS};vertical-align:top;white-space:nowrap;">
+    {html.escape(label)}
+  </td>
+  <td width="74%" valign="top"
+    style="width:74%;padding:9px 0 9px 12px;border-bottom:{border};color:#3E3836;font-size:14px;
+    line-height:1.55;font-weight:600;font-family:{FONT_SANS};vertical-align:top;word-break:break-word;">
+    {value_html}
+  </td>
+</tr>
+"""
+
+
+def email_kv_table(rows: list[tuple[str, str]]) -> str:
+    if not rows:
+        return ""
+    body = "".join(
+        email_kv_row(label, value_html, last=(idx == len(rows) - 1))
+        for idx, (label, value_html) in enumerate(rows)
+    )
+    return f"""
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  style="width:100%;border-collapse:collapse;margin-top:4px;">
+  {body}
+</table>
+"""
+
+
+def email_chip(text: str, *, bg: str, color: str, border: str) -> str:
+    return (
+        f'<span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;'
+        f"border-radius:999px;font-size:12px;line-height:1.4;background:{bg};"
+        f"color:{color};border:1px solid {border};font-family:{FONT_SANS};"
+        f'font-weight:600;">{html.escape(text)}</span>'
+    )
+
+
+def render_direction_chips(items: list[str]) -> str:
+    if not items:
+        return "无"
+    return "".join(
+        email_chip(item, bg="#F8F3EA", color="#6E6158", border="#E9DDD0") for item in items
+    )
+
+
 def render_html(result: CalendarResult) -> str:
     holiday_value = html.escape(join_items(result.holidays)) if result.holidays else "今日无特别节日"
     preheader = (
         f"{result.solar_date} {result.weekday} · {result.lunar_date} · "
         f"{result.level_short} · {officer_line(result)}"
     )
-    path_badge = html.escape(result.day_path or result.level_short)
-    path_is_good = "黄道" in (result.day_path or "")
+    path_is_good = "黄道" in (result.day_path or "") or "吉" in (result.level_short or "")
     path_bg = "#F0F5F1" if path_is_good else "#FAF1F0"
     path_color = "#4E7A5A" if path_is_good else "#9B3D3D"
+    path_border = "#DBE8DF" if path_is_good else "#EFD6D2"
 
-    meta_lines = [
-        f"干支：{html.escape(result.ganzhi)}",
-        f"冲煞：{html.escape(result.zodiac_clash)}",
-        f"建除：{html.escape(officer_line(result))}",
-        f"吉凶：{html.escape(result.level_short)}",
-    ]
-    if result.level_name and result.level_name not in {"无", result.level_short}:
-        meta_lines.append(f"说明：{html.escape(result.level_name)}")
-    if result.directions:
-        meta_lines.append(f"方位：{html.escape(join_items(result.directions))}")
-    if result.fetal_god:
-        meta_lines.append(f"胎神：{html.escape(result.fetal_god)}")
-    if result.peng_taboo:
-        meta_lines.append(f"彭祖百忌：{html.escape(result.peng_taboo)}")
-    if result.nayin:
-        meta_lines.append(f"纳音：{html.escape(result.nayin)}")
-    if result.star28:
-        meta_lines.append(f"二十八宿：{html.escape(result.star28)}")
-
-    meta_html = "".join(
-        (
-            f'<div style="margin-top:4px;font-size:15px;font-weight:500;line-height:1.5;'
-            f'color:#7A6C66;font-family:{FONT_SANS};word-break:break-word;">{line}</div>'
+    # 徽章：黄道/黑道 + 吉/凶；避免与下方「建除/说明」重复堆叠
+    badges: list[str] = []
+    if result.day_path:
+        badges.append(
+            email_chip(result.day_path, bg=path_bg, color=path_color, border=path_border)
         )
-        for line in meta_lines
-    )
+    luck_text = (result.level_short or "").replace("黄道", "").replace("黑道", "").strip() or result.level_short
+    if luck_text and luck_text not in {result.day_path, ""}:
+        luck_good = "吉" in luck_text and "凶" not in luck_text
+        badges.append(
+            email_chip(
+                luck_text,
+                bg="#F0F5F1" if luck_good else "#FAF1F0",
+                color="#4E7A5A" if luck_good else "#9B3D3D",
+                border="#DBE8DF" if luck_good else "#EFD6D2",
+            )
+        )
+    if result.officer12:
+        badges.append(
+            email_chip(result.officer12, bg="#F8F3EA", color="#6E6158", border="#E9DDD0")
+        )
+    if result.day_star:
+        badges.append(
+            email_chip(result.day_star, bg="#F8F3EA", color="#6E6158", border="#E9DDD0")
+        )
+    badge_html = "".join(badges) if badges else email_chip(result.level_short or "平", bg=path_bg, color=path_color, border=path_border)
+
+    primary_rows: list[tuple[str, str]] = [
+        ("干支", html.escape(result.ganzhi)),
+        ("冲煞", html.escape(result.zodiac_clash)),
+    ]
+    secondary_rows: list[tuple[str, str]] = []
+    if result.directions:
+        secondary_rows.append(("方位", render_direction_chips(result.directions)))
+    if result.fetal_god:
+        secondary_rows.append(("胎神", html.escape(result.fetal_god)))
+    if result.peng_taboo:
+        # 彭祖两句换行，避免超长一行
+        peng = "；".join(part.strip() for part in result.peng_taboo.split("；") if part.strip())
+        peng_html = "<br>".join(html.escape(p) for p in peng.split("；"))
+        secondary_rows.append(("彭祖百忌", peng_html))
+    if result.nayin:
+        secondary_rows.append(("纳音", html.escape(result.nayin)))
+    if result.star28:
+        secondary_rows.append(("二十八宿", html.escape(result.star28)))
+
+    meta_html = email_kv_table(primary_rows)
+    if secondary_rows:
+        meta_html += (
+            '<div style="height:10px;line-height:10px;font-size:0;border-top:1px dashed #E7DDD1;'
+            'margin-top:4px;">&nbsp;</div>'
+            + email_kv_table(secondary_rows)
+        )
 
     good_body = (
         f'<div style="color:#4E7A5A;font-size:14px;line-height:1.8;font-weight:500;'
@@ -690,12 +768,10 @@ def render_html(result: CalendarResult) -> str:
                       letter-spacing:0.02em;color:#9B3D3D;font-family:{FONT_SERIF};">
                       {html.escape(result.lunar_date)}
                     </div>
-                    <div style="margin-top:12px;">
-                      <span style="display:inline-block;padding:5px 12px;border-radius:999px;
-                        background:{path_bg};color:{path_color};font-size:13px;font-weight:700;
-                        font-family:{FONT_SANS};">{path_badge}</span>
+                    <div style="margin-top:14px;line-height:1.2;">
+                      {badge_html}
                     </div>
-                    <div style="margin-top:10px;">
+                    <div style="margin-top:8px;">
                       {meta_html}
                     </div>
                   </td>
