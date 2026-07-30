@@ -27,8 +27,9 @@
 
 ## 调度
 
-- 定时：`43 22 * * *`（UTC）≈ 北京时间次日 06:43
-- 手动：Actions → Daily Huangli Mailer → Run workflow
+- 定时：由 **Cloudflare Workers Cron** 调用 `workflow_dispatch`（建议 UTC `43 22 * * *` ≈ 北京时间 06:43）
+- 本仓库 **不再** 使用 GitHub Actions `schedule`（避免免费队列延迟）
+- 手动：Actions → Daily Huangli Mailer → Run workflow；或请求 Worker 的测试路径（若已配置）
 
 ## 结构
 
