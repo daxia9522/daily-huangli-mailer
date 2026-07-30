@@ -1,8 +1,7 @@
 name: Daily Huangli Mailer
 
 on:
-  schedule:
-    - cron: '43 22 * * *'
+  # 定时改由 Cloudflare Workers Cron 触发 workflow_dispatch，避免 GitHub schedule 延迟
   workflow_dispatch:
 
 jobs:
